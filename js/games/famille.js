@@ -53,8 +53,9 @@ GameEngines['famille'] = {
       answererId,
       winnerId: null,
       timerRunning: false,   // le chrono ne démarre QUE quand le meneur le lance
-      roundStartedAt: null,  // pour calculer le compte à rebours côté client
-      timerDuration: FAMILLE_TIMER_SECONDS,
+      roundStartedAt: null,  // horodatage du clic du meneur (cf. mount() pour pourquoi
+                              // on ne calcule PAS le temps restant directement à partir
+                              // de cette valeur sur chaque appareil)
     };
   },
 
@@ -73,6 +74,15 @@ GameEngines['famille'] = {
     let timerHandle = null;
     const stopTimer = () => { if (timerHandle) { clearInterval(timerHandle); timerHandle = null; } };
 
+    // Ancre LOCALE du chrono : chaque appareil mesure son propre écoulement
+    // (performance.now()) à partir du moment où IL a vu le départ, plutôt
+    // que de comparer son Date.now() à l'horodatage du meneur. Avant, un
+    // simple décalage d'horloge entre deux téléphones (très courant) faisait
+    // démarrer le compte à rebours à une valeur différente sur chaque
+    // appareil. `key` identifie la manche+lancement courant pour ne réancrer
+    // qu'au véritable démarrage, pas à chaque re-render.
+    let timerAnchor = null;
+
     const render = (s) => {
       stopTimer();
       root.innerHTML = '';
@@ -89,7 +99,6 @@ GameEngines['famille'] = {
           winnerId: null,
           timerRunning: false,
           roundStartedAt: null,
-          timerDuration: FAMILLE_TIMER_SECONDS,
           ...fallbackRoles,
           ...s,
         };
@@ -116,7 +125,7 @@ GameEngines['famille'] = {
               ${s.timerRunning
                 ? `<div id="famille-timer" style="font-family:'Space Mono',monospace;font-size:22px;font-weight:700;color:var(--accent4)">--:--</div>`
                 : isLeader
-                  ? `<button class="btn-primary" style="--g1:${g.g1};--g2:${g.g2};width:auto;padding:10px 16px;font-size:14px" onclick="familleStartTimer()">▶️ Démarrer (${s.timerDuration}s)</button>`
+                  ? `<button class="btn-primary" style="--g1:${g.g1};--g2:${g.g2};width:auto;padding:10px 16px;font-size:14px" onclick="familleStartTimer()">▶️ Démarrer (${FAMILLE_TIMER_SECONDS}s)</button>`
                   : `<div style="font-size:11px;color:var(--muted);text-align:right">⏱️ En attente<br>du meneur</div>`}
             </div>
             ${!amAnswerer && !isLeader ? `<div style="font-size:12px;color:var(--muted);text-align:center">Vous observez cette manche — les points iront à ${answerer.name} si la réponse est validée. Premier à ${FAMILLE_WIN_SCORE} pts gagne !</div>` : ''}
@@ -164,11 +173,19 @@ GameEngines['famille'] = {
         // ── Timer (affichage local uniquement) ── ne tourne que si le
         // meneur l'a démarré (s.timerRunning), jamais automatiquement.
         if (s.timerRunning) {
+          // Réancre seulement si c'est un nouveau lancement (clé = horodatage
+          // du meneur, identique pour tous les appareils sur cette manche) ;
+          // un re-render lié à une autre action pendant le chrono ne doit
+          // pas le redémarrer à 60s.
+          const anchorKey = `${s.questionCount}:${s.roundStartedAt}`;
+          if (!timerAnchor || timerAnchor.key !== anchorKey) {
+            timerAnchor = { key: anchorKey, start: performance.now() };
+          }
           const timerEl = document.getElementById('famille-timer');
           let timeUpTriggered = false;
           const tick = () => {
-            const elapsed = Math.floor((Date.now() - s.roundStartedAt) / 1000);
-            const remaining = Math.max(0, s.timerDuration - elapsed);
+            const elapsed = Math.floor((performance.now() - timerAnchor.start) / 1000);
+            const remaining = Math.max(0, FAMILLE_TIMER_SECONDS - elapsed);
             const mm = String(Math.floor(remaining / 60)).padStart(2, '0');
             const ss = String(remaining % 60).padStart(2, '0');
             if (timerEl) {

@@ -429,6 +429,10 @@ function _launchGame(gameId, state) {
     );
 
     if (typeof handleExternalUpdate === 'function') {
+      // tag 'game' : canal distinct de celui du lobby (room:<id>:lobby),
+      // qu'on vient de désabonner juste au-dessus — voir le commentaire
+      // sur DB.subscribeRoom pour pourquoi ils ne doivent pas partager
+      // le même nom de canal.
       Session.gameSub = DB.subscribeRoom(Session.room.id, (room) => {
         if (!room.game_state) return;
         Logger.debug('lobby', 'État de jeu reçu (realtime)', gameId, room.game_state.phase);
@@ -437,7 +441,7 @@ function _launchGame(gameId, state) {
           Logger.error('lobby', `Échec du re-rendu de "${gameId}" sur update realtime :`, e.message, e.stack);
           showFatalError(e.message);
         }
-      });
+      }, 'game');
     } else {
       Logger.warn('lobby', `GameEngines['${gameId}'].mount() ne retourne pas de fonction de mise à jour — les autres joueurs ne verront pas les changements en direct.`);
     }

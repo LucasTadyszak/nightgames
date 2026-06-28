@@ -125,14 +125,25 @@ const DB = {
 
   // ── Realtime subscriptions ────────────────────────────────
 
-  /** Subscribe to room changes (status, game_state) */
-  subscribeRoom(roomId, callback) {
-    Logger.debug('db', 'subscribeRoom', roomId);
-    return _sb.channel(`room:${roomId}`)
+  /**
+   * Subscribe to room changes (status, game_state).
+   * `tag` distingue le canal du lobby de celui de la partie en cours :
+   * lobby.js désabonne le canal du lobby (`Session.roomSub`, tag par
+   * défaut) puis recrée immédiatement un canal pour la partie
+   * (`Session.gameSub`) au même roomId. `removeChannel()` est
+   * asynchrone côté supabase-js — si les deux canaux portaient le même
+   * nom, le second pourrait réutiliser l'ancien objet pas encore
+   * vraiment retiré côté serveur, retardant de plusieurs secondes la
+   * réception des mises à jour (c'est ce qui causait le décalage du
+   * chrono entre le meneur et les autres joueurs).
+   */
+  subscribeRoom(roomId, callback, tag = 'lobby') {
+    Logger.debug('db', 'subscribeRoom', roomId, tag);
+    return _sb.channel(`room:${roomId}:${tag}`)
       .on('postgres_changes', {
         event: 'UPDATE', schema: 'public', table: 'rooms',
         filter: `id=eq.${roomId}`
-      }, payload => { Logger.debug('db', 'room update reçu', roomId); callback(payload.new); })
+      }, payload => { Logger.debug('db', 'room update reçu', roomId, tag); callback(payload.new); })
       .subscribe();
   },
 
