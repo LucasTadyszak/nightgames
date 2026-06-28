@@ -226,14 +226,14 @@ GameEngines['loups'] = {
         if (isHost) window.loupReplay = () => { Logger.info('loups', 'Nouvelle partie'); const ns=GameEngines.loups.initState(players); onStateChange(ns); render(ns); };
       }
 
-      if (!isHost) {
-        _sub = DB.subscribeRoom(Session.room.id, (room) => {
-          if (!room.game_state) return;
-          Logger.debug('loups', 'État reçu', room.game_state.phase);
-          try { render(room.game_state); }
-          catch (e) { Logger.error('loups', 'render() a échoué sur update realtime :', e.message, e.stack); showFatalError(e.message); }
-        });
-      }
+      // Tout le monde s'abonne : loupNextReveal peut être déclenché par un
+      // invité actif (pas que le host), le host doit donc aussi être notifié.
+      _sub = DB.subscribeRoom(Session.room.id, (room) => {
+        if (!room.game_state) return;
+        Logger.debug('loups', 'État reçu', room.game_state.phase);
+        try { render(room.game_state); }
+        catch (e) { Logger.error('loups', 'render() a échoué sur update realtime :', e.message, e.stack); showFatalError(e.message); }
+      });
     };
 
     render(state);

@@ -33,6 +33,8 @@ GameEngines['verite'] = {
     return {
       phase: 'choose',   // choose | card | scores
       turnIndex: 0,
+      turnsPlayed: 0,
+      totalTurns: players.length * 3,   // ~3 tours par joueur avant les scores finaux
       order,
       activePlayerId: order[0],
       cardType: null,    // 'verite' | 'defi'
@@ -69,6 +71,7 @@ GameEngines['verite'] = {
                 <button class="btn-primary" style="--g1:#ff3d6b;--g2:#ff9500;padding:24px;font-size:22px" onclick="vtChoose('verite')">🗣️<br>VÉRITÉ</button>
                 <button class="btn-primary" style="--g1:#7c3aed;--g2:#00aaff;padding:24px;font-size:22px" onclick="vtChoose('defi')">💥<br>DÉFI</button>
               </div>
+              ${isHost ? `<button class="btn-secondary" id="vt-btn-end" style="margin-top:4px">🏁 Terminer la partie</button>` : ''}
             </div>
           `;
           window.vtChoose = (type) => {
@@ -86,7 +89,15 @@ GameEngines['verite'] = {
               <div class="waiting-sub">choisit entre Vérité ou Défi…</div>
               <div style="display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px"><div class="pulse-dot"></div>En attente</div>
             </div>
+            ${isHost ? `<div style="padding:0 24px"><button class="btn-secondary" id="vt-btn-end">🏁 Terminer la partie</button></div>` : ''}
           `;
+        }
+        if (isHost) {
+          root.querySelector('#vt-btn-end')?.addEventListener('click', () => {
+            Logger.info('verite', 'Fin de partie demandée par le host (manuel)');
+            const ns = { ...s, phase: 'scores', cardType: null, cardText: null };
+            onStateChange(ns); render(ns);
+          });
         }
 
       } else if (s.phase === 'card') {
@@ -105,8 +116,9 @@ GameEngines['verite'] = {
                 <button class="btn-primary" style="--g1:#00d4aa;--g2:#00aaff" onclick="vtResult(true)">✅ Réussi ! (+2pts)</button>
                 <button class="btn-secondary" onclick="vtResult(false)">❌ Refusé</button>
               </div>
+              <button class="btn-secondary" id="vt-btn-end">🏁 Terminer la partie</button>
             ` : `
-              <div class="guest-waiting"><div class="pulse-dot"></div>${isHost?'':'Attente du résultat…'}</div>
+              <div class="guest-waiting"><div class="pulse-dot"></div>Attente du résultat…</div>
             `}
             <div class="score-list">
               ${players.map(p => `
@@ -123,6 +135,17 @@ GameEngines['verite'] = {
           window.vtResult = (success) => {
             let ns = { ...s, scores:{...s.scores} };
             if (success) ns.scores[activeId] = (ns.scores[activeId]||0) + 2;
+
+            const turnsPlayed = s.turnsPlayed + 1;
+            ns.turnsPlayed = turnsPlayed;
+
+            if (turnsPlayed >= s.totalTurns) {
+              ns.phase = 'scores';
+              ns.cardType = null; ns.cardText = null;
+              Logger.info('verite', 'Fin de partie après', turnsPlayed, 'tours');
+              onStateChange(ns); render(ns); return;
+            }
+
             // Next player
             const nextIdx = (s.turnIndex + 1) % players.length;
             ns.phase        = 'choose';
@@ -131,6 +154,11 @@ GameEngines['verite'] = {
             ns.cardType     = null; ns.cardText = null;
             onStateChange(ns); render(ns);
           };
+          root.querySelector('#vt-btn-end')?.addEventListener('click', () => {
+            Logger.info('verite', 'Fin de partie demandée par le host (manuel)');
+            const ns = { ...s, scores:{...s.scores}, phase: 'scores', cardType: null, cardText: null };
+            onStateChange(ns); render(ns);
+          });
         }
 
       } else if (s.phase === 'scores') {
@@ -140,15 +168,17 @@ GameEngines['verite'] = {
         });
       }
 
-      // Guests subscribe to state push
-      if (!isHost) {
-        _sub = DB.subscribeRoom(Session.room.id, (room) => {
-          if (!room.game_state) return;
-          Logger.debug('verite', 'État reçu', room.game_state.phase);
-          try { render(room.game_state); }
-          catch (e) { Logger.error('verite', 'render() a échoué sur update realtime :', e.message, e.stack); showFatalError(e.message); }
-        });
-      }
+      // Tout le monde s'abonne aux mises à jour temps réel — pas que les
+      // invités. Depuis que n'importe quel joueur ACTIF (pas seulement le
+      // host) peut écrire l'état (cf. lobby.js), le host doit lui aussi
+      // être notifié quand un invité fait son choix Vérité/Défi, sinon son
+      // écran reste figé sur l'ancien état en attendant son propre tour.
+      _sub = DB.subscribeRoom(Session.room.id, (room) => {
+        if (!room.game_state) return;
+        Logger.debug('verite', 'État reçu', room.game_state.phase);
+        try { render(room.game_state); }
+        catch (e) { Logger.error('verite', 'render() a échoué sur update realtime :', e.message, e.stack); showFatalError(e.message); }
+      });
     };
 
     render(state);

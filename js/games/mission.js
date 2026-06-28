@@ -151,14 +151,14 @@ GameEngines['mission'] = {
         });
       }
 
-      if (!isHost) {
-        _sub = DB.subscribeRoom(Session.room.id, (room) => {
-          if (!room.game_state) return;
-          Logger.debug('mission', 'État reçu', room.game_state.phase);
-          try { render(room.game_state); }
-          catch (e) { Logger.error('mission', 'render() a échoué sur update realtime :', e.message, e.stack); showFatalError(e.message); }
-        });
-      }
+      // Tout le monde s'abonne : missionAccept peut être déclenché par un
+      // invité actif (pas que le host), le host doit donc aussi être notifié.
+      _sub = DB.subscribeRoom(Session.room.id, (room) => {
+        if (!room.game_state) return;
+        Logger.debug('mission', 'État reçu', room.game_state.phase);
+        try { render(room.game_state); }
+        catch (e) { Logger.error('mission', 'render() a échoué sur update realtime :', e.message, e.stack); showFatalError(e.message); }
+      });
     };
 
     render(state);
