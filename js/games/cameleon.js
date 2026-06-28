@@ -78,6 +78,10 @@ GameEngines['cameleon'] = {
 
     const render = (s) => {
       unsub();
+      // Tolère un state persisté par une version antérieure du jeu
+      // (avant l'ajout de guesses/options/revealed) pour ne pas planter
+      // sur une partie déjà en cours au moment de la mise à jour.
+      s = { options: [], guesses: {}, revealed: false, ...s };
       root.innerHTML = '';
       const myId = me.id;
       const activeId = s.activeRolePlayerId;
