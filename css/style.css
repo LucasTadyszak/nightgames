@@ -411,6 +411,18 @@ body::before {
 .vote-btn:active { transform:scale(.95); }
 .vote-btn.selected { border-color:var(--accent3); background:rgba(0,212,170,.1); color:var(--accent3); }
 
+/* Flash plein écran quand le chrono d'Une Famille en Or arrive à zéro */
+@keyframes famille-timeup-flash {
+  0%   { background: rgba(255,61,107,0); }
+  15%  { background: rgba(255,61,107,.45); }
+  100% { background: rgba(255,61,107,0); }
+}
+.famille-timeup-flash::before {
+  content: ''; position: fixed; inset: 0; z-index: 100;
+  pointer-events: none;
+  animation: famille-timeup-flash .9s ease-out;
+}
+
 /* Answer card (Famille en Or) */
 .answer-row {
   display:flex; align-items:center; gap:14px;

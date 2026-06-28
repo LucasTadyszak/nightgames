@@ -6,7 +6,7 @@
 // cf. app.js et supabase_seed.sql). FAMILLE_CATEGORIES servira plus tard
 // à laisser les joueurs choisir leurs thèmes avant de lancer la partie.
 
-const FAMILLE_TIMER_SECONDS = 30;
+const FAMILLE_TIMER_SECONDS = 60;
 const FAMILLE_WIN_SCORE = 100;
 
 // Calcule qui mène et qui répond pour la manche `idx`, à partir d'un ordre
@@ -21,6 +21,15 @@ function _familleRoundRoles(order, idx) {
     leaderId: order[idx % n],
     answererId: order[(idx + 1) % n],
   };
+}
+
+// Effet visuel + vibration quand le chrono arrive à zéro — joué une seule
+// fois localement par chaque appareil (synchronisé puisque tous calculent
+// le même compte à rebours à partir du même roundStartedAt partagé).
+function _familleTimeUpEffect(root) {
+  root.classList.add('famille-timeup-flash');
+  setTimeout(() => root.classList.remove('famille-timeup-flash'), 900);
+  if (navigator.vibrate) navigator.vibrate([120, 60, 120]);
 }
 
 GameEngines['famille'] = {
@@ -43,7 +52,8 @@ GameEngines['famille'] = {
       leaderId,
       answererId,
       winnerId: null,
-      roundStartedAt: Date.now(),  // pour calculer le compte à rebours côté client
+      timerRunning: false,   // le chrono ne démarre QUE quand le meneur le lance
+      roundStartedAt: null,  // pour calculer le compte à rebours côté client
       timerDuration: FAMILLE_TIMER_SECONDS,
     };
   },
@@ -77,7 +87,8 @@ GameEngines['famille'] = {
           order: fallbackOrder,
           totalRounds: players.length,
           winnerId: null,
-          roundStartedAt: Date.now(),
+          timerRunning: false,
+          roundStartedAt: null,
           timerDuration: FAMILLE_TIMER_SECONDS,
           ...fallbackRoles,
           ...s,
@@ -102,7 +113,11 @@ GameEngines['famille'] = {
                 <div class="turn-banner-label">CETTE QUESTION EST POUR</div>
                 <div class="turn-banner-name">${answerer.avatar} ${answerer.name}${amAnswerer ? ' (toi)' : ''}</div>
               </div>
-              <div id="famille-timer" style="font-family:'Space Mono',monospace;font-size:22px;font-weight:700;color:var(--accent4)">--:--</div>
+              ${s.timerRunning
+                ? `<div id="famille-timer" style="font-family:'Space Mono',monospace;font-size:22px;font-weight:700;color:var(--accent4)">--:--</div>`
+                : isLeader
+                  ? `<button class="btn-primary" style="--g1:${g.g1};--g2:${g.g2};width:auto;padding:10px 16px;font-size:14px" onclick="familleStartTimer()">▶️ Démarrer (${s.timerDuration}s)</button>`
+                  : `<div style="font-size:11px;color:var(--muted);text-align:right">⏱️ En attente<br>du meneur</div>`}
             </div>
             ${!amAnswerer && !isLeader ? `<div style="font-size:12px;color:var(--muted);text-align:center">Vous observez cette manche — les points iront à ${answerer.name} si la réponse est validée. Premier à ${FAMILLE_WIN_SCORE} pts gagne !</div>` : ''}
 
@@ -146,21 +161,38 @@ GameEngines['famille'] = {
           </div>
         `;
 
-        // ── Timer (affichage local uniquement) ──
-        const timerEl = document.getElementById('famille-timer');
-        const tick = () => {
-          const elapsed = Math.floor((Date.now() - s.roundStartedAt) / 1000);
-          const remaining = Math.max(0, s.timerDuration - elapsed);
-          const mm = String(Math.floor(remaining / 60)).padStart(2, '0');
-          const ss = String(remaining % 60).padStart(2, '0');
-          if (timerEl) {
-            timerEl.textContent = `${mm}:${ss}`;
-            timerEl.style.color = remaining === 0 ? '#ff3d6b' : (remaining <= 10 ? '#ff9500' : 'var(--accent4)');
-          }
-          if (remaining === 0) stopTimer();
-        };
-        tick();
-        timerHandle = setInterval(tick, 1000);
+        // ── Timer (affichage local uniquement) ── ne tourne que si le
+        // meneur l'a démarré (s.timerRunning), jamais automatiquement.
+        if (s.timerRunning) {
+          const timerEl = document.getElementById('famille-timer');
+          let timeUpTriggered = false;
+          const tick = () => {
+            const elapsed = Math.floor((Date.now() - s.roundStartedAt) / 1000);
+            const remaining = Math.max(0, s.timerDuration - elapsed);
+            const mm = String(Math.floor(remaining / 60)).padStart(2, '0');
+            const ss = String(remaining % 60).padStart(2, '0');
+            if (timerEl) {
+              timerEl.textContent = `${mm}:${ss}`;
+              timerEl.style.color = remaining === 0 ? '#ff3d6b' : (remaining <= 10 ? '#ff9500' : 'var(--accent4)');
+            }
+            if (remaining === 0) {
+              stopTimer();
+              if (!timeUpTriggered) { timeUpTriggered = true; _familleTimeUpEffect(root); }
+            }
+          };
+          tick();
+          timerHandle = setInterval(tick, 1000);
+        }
+
+        // Le meneur déclenche lui-même le départ du chrono pour cette
+        // manche — il ne se lance plus automatiquement à l'affichage.
+        if (isLeader && !s.timerRunning) {
+          window.familleStartTimer = () => {
+            Logger.info('famille', 'Chrono démarré par le meneur');
+            const ns = { ...s, timerRunning: true, roundStartedAt: Date.now() };
+            onStateChange(ns); render(ns);
+          };
+        }
 
         // Vérifie la victoire immédiate à 100 pts et bascule vers les
         // scores si c'est le cas, sinon poursuit vers la manche suivante
@@ -215,7 +247,8 @@ GameEngines['famille'] = {
               questionCount: nextQuestionCount,
               leaderId,
               answererId,
-              roundStartedAt: Date.now(),
+              timerRunning: false,
+              roundStartedAt: null,
             };
             onStateChange(ns); render(ns);
           };
