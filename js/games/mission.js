@@ -2,23 +2,13 @@
 // games/mission.js
 // ══════════════════════════════════════
 
-const MISSIONS_LIST = [
-  'Fais dire le mot "banane" à quelqu\'un sans qu\'il s\'en rende compte.',
-  'Convaincs quelqu\'un de changer de place avec toi.',
-  'Fais rire quelqu\'un en moins de 30 secondes — 3 fois dans la soirée.',
-  'Obtiens un high-five de chaque joueur sans que ça semble forcé.',
-  'Pose la même question bizarre à 3 personnes différentes.',
-  'Convaincs quelqu\'un de faire quelque chose qu\'il ne voulait pas faire.',
-  'Mentionne un pays imaginaire dans une vraie conversation.',
-  'Fais semblant de chercher quelque chose toute la soirée sans explication.',
-  'Utilise le mot "manifestement" dans toutes tes phrases pendant 5 minutes.',
-  'Fais dire "oui" à quelqu\'un 5 fois de suite avant qu\'il réalise.',
-];
+// Les missions vivent en base (GameContent.missionList, chargées au boot
+// — cf. app.js et supabase_seed.sql).
 
 GameEngines['mission'] = {
 
   initState(players) {
-    const shuffledMissions = shuffle(MISSIONS_LIST);
+    const shuffledMissions = shuffle(GameContent.missionList);
     const assignments = Object.fromEntries(
       players.map((p, i) => [p.id, {
         mission: shuffledMissions[i % shuffledMissions.length],

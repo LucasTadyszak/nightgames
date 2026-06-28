@@ -31,6 +31,9 @@ Chaque joueur rejoint via un **code de salle** (comme Kahoot), sur son propre t�
 1. Dans Supabase → **SQL Editor** → **New query**
 2. Copier-coller tout le contenu de `supabase_schema.sql`
 3. Cliquer **Run**
+4. Nouvelle requête → copier-coller tout le contenu de `supabase_seed.sql`
+   (questions, rôles, cartes, règles — 200 questions pour Une Famille en
+   Or, etc.) → **Run**
 
 ### 3. Récupérer les clés API
 

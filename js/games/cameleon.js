@@ -2,25 +2,9 @@
 // games/cameleon.js
 // ══════════════════════════════════════
 
-const CAMELEON_ROLES = [
-  { role:'Chef cuisinier stressé',     hint:'Tu brûles tout ce que tu touches ce soir' },
-  { role:'Agent secret en mission',    hint:'Tu dois garder ton identité secrète à tout prix' },
-  { role:'Influenceur en perte de vues', hint:'Tu cherches désespérément du contenu pour tes réseaux' },
-  { role:'Touriste perdu dans ta ville', hint:'Tout te semble étrange et nouveau' },
-  { role:'Médecin de garde épuisé',    hint:'Tu n\'as pas dormi depuis 36 heures' },
-  { role:'Milliardaire incognito',     hint:'Tu essaies de passer inaperçu mais tu n\'y arrives pas' },
-  { role:'Détective privé en filature', hint:'Tu observes tout le monde avec suspicion' },
-  { role:'Rockstar en retraite forcée', hint:'Tu parles de ta gloire passée à tout moment' },
-];
-
-const CAMELEON_QUESTIONS = [
-  'Si tu étais un plat, tu serais lequel ?',
-  'Décris ta soirée idéale en 3 mots.',
-  'Quel animal te représente le mieux ce soir ?',
-  'Si tu devais fuir quelque part maintenant, où tu irais ?',
-  'Quel est ton superpouvoir secret ?',
-  'Décris ta journée comme si c\'était un film.',
-];
+// Les rôles et questions vivent en base (GameContent.cameleonRoles /
+// GameContent.cameleonQuestions, chargés au boot — cf. app.js et
+// supabase_seed.sql) au lieu d'être codés en dur ici.
 
 // Liste les joueurs de `pool` dont l'id n'apparaît pas dans `doneMap`,
 // pour afficher "en attente de Léo, Sam" plutôt qu'un simple compteur.
@@ -29,7 +13,7 @@ function _cameleonPending(pool, doneMap) {
 }
 
 function _cameleonOptionsFor(role) {
-  const wrongOptions = shuffle(CAMELEON_ROLES.filter(r => r.role !== role.role)).slice(0, 3);
+  const wrongOptions = shuffle(GameContent.cameleonRoles.filter(r => r.role !== role.role)).slice(0, 3);
   return shuffle([role, ...wrongOptions]).map(o => o.role);
 }
 
@@ -54,8 +38,8 @@ function _cameleonReveal(s, players) {
 GameEngines['cameleon'] = {
 
   initState(players) {
-    const role = CAMELEON_ROLES[Math.floor(Math.random() * CAMELEON_ROLES.length)];
-    const question = CAMELEON_QUESTIONS[Math.floor(Math.random() * CAMELEON_QUESTIONS.length)];
+    const role = GameContent.cameleonRoles[Math.floor(Math.random() * GameContent.cameleonRoles.length)];
+    const question = GameContent.cameleonQuestions[Math.floor(Math.random() * GameContent.cameleonQuestions.length)];
     const order = shuffle(players.map(p => p.id));
     const scores = Object.fromEntries(players.map(p => [p.id, 0]));
     // Assign the secret role to the first player in shuffled order
@@ -208,8 +192,8 @@ GameEngines['cameleon'] = {
             }
             const newOrder = s.order;
             const nextActiveId = newOrder[newTurn % newOrder.length];
-            const newRole = CAMELEON_ROLES[Math.floor(Math.random()*CAMELEON_ROLES.length)];
-            const newQ = CAMELEON_QUESTIONS[Math.floor(Math.random()*CAMELEON_QUESTIONS.length)];
+            const newRole = GameContent.cameleonRoles[Math.floor(Math.random()*GameContent.cameleonRoles.length)];
+            const newQ = GameContent.cameleonQuestions[Math.floor(Math.random()*GameContent.cameleonQuestions.length)];
             const ns = { ...s, phase:'show_role', turn:newTurn, activeRolePlayerId:nextActiveId, role:newRole, question:newQ, options:[], guesses:{}, revealed:false, ready:{} };
             onStateChange(ns); render(ns);
           };

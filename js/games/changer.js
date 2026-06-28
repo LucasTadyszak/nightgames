@@ -2,21 +2,13 @@
 // games/changer.js
 // ══════════════════════════════════════
 
-const CHANGER_RULES = [
-  { icon:'⚡', name:'SPEED ROUND',          rule:'Le premier à taper sur la table après chaque question marque 1 pt. Si tu te trompes de réponse, tu perds 2 pts !', action:'Posez-vous des questions de culture générale.' },
-  { icon:'🤫', name:'CHUCHOTEUR',           rule:'TOUT LE MONDE doit chuchoter. Parler normalement = −1 pt. Le dernier à parler fort est éliminé.', action:'Continuez à jouer normalement mais en chuchotant.' },
-  { icon:'🔄', name:'MIROIR',               rule:'Tout ce qu\'un joueur fait, son voisin de gauche doit l\'imiter exactement. Rater = −1 pt.', action:'Essayez de piéger votre voisin avec des gestes compliqués.' },
-  { icon:'🎭', name:'INTERDIT DE RIRE',     rule:'Personne ne doit sourire. Le premier qui rit donne 3 pts à tous les autres. Durée : 2 minutes.', action:'Essayez de faire rire les autres sans sourire vous-même.' },
-  { icon:'📱', name:'SANS LES MAINS',       rule:'Vous ne pouvez pas utiliser vos mains. Utiliser ses mains = −2 pts.', action:'Accomplissez des défis sans utiliser vos mains.' },
-  { icon:'🔢', name:'CHIFFRES INTERDITS',   rule:'Remplacez tous les chiffres par "BZZZ". Dire un chiffre = −1 pt. Durée : 3 minutes.', action:'Discutez normalement en censurant chaque chiffre.' },
-  { icon:'🎤', name:'MICRO OUVERT',         rule:'Tout ce que tu penses, tu dois le dire à voix haute. Rester silencieux = −1 pt.', action:'Chaque pensée doit être vocalisée !' },
-  { icon:'🕺', name:'DANSE OBLIGATOIRE',    rule:'À chaque fois qu\'on dit le mot "je", tout le monde doit danser 3 secondes. Oublier = −1 pt.', action:'Discutez normalement en surveillant le mot "je".' },
-];
+// Les règles vivent en base (GameContent.changerRules, chargées au boot
+// — cf. app.js et supabase_seed.sql).
 
 GameEngines['changer'] = {
 
   initState(players) {
-    const ruleIdx = Math.floor(Math.random()*CHANGER_RULES.length);
+    const ruleIdx = Math.floor(Math.random()*GameContent.changerRules.length);
     const scores  = Object.fromEntries(players.map(p=>[p.id,0]));
     return {
       phase: 'reveal',    // reveal | play | adjust | scores
@@ -35,7 +27,7 @@ GameEngines['changer'] = {
 
     const render = (s) => {
       root.innerHTML='';
-      const rule = CHANGER_RULES[s.ruleIdx];
+      const rule = GameContent.changerRules[s.ruleIdx];
       const g = { g1:'#ff6b35', g2:'#7c3aed' };
 
       if (s.phase === 'reveal' || (!s.revealed && s.phase==='reveal')) {
@@ -128,7 +120,7 @@ GameEngines['changer'] = {
           };
           window.changerNextRound = () => {
             let nextRuleIdx;
-            do { nextRuleIdx = Math.floor(Math.random()*CHANGER_RULES.length); }
+            do { nextRuleIdx = Math.floor(Math.random()*GameContent.changerRules.length); }
             while (nextRuleIdx === s.ruleIdx);
             const ns = { ruleIdx:nextRuleIdx, round:s.round+1, phase:'reveal', revealed:false, scores:localScores };
             onStateChange(ns); render(ns);

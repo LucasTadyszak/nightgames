@@ -2,28 +2,8 @@
 // games/verite.js
 // ══════════════════════════════════════
 
-const VERITE_DATA = {
-  verite: [
-    'Quelle est la chose la plus embarrassante que tu aies faite en public ?',
-    'Quel est ton plus grand mensonge qui a réussi ?',
-    'Qui dans ce groupe t\'agace le plus parfois ?',
-    'Quel secret tu n\'aurais jamais pensé révéler ce soir ?',
-    'Quelle est la chose la plus folle que tu aies faite pour quelqu\'un ?',
-    'Quelle appli sur ton téléphone tu ne montrerais jamais à tes parents ?',
-    'Quel est ton pire souvenir de soirée ?',
-    'Décris ta pire date en une phrase.',
-  ],
-  defi: [
-    'Appelle quelqu\'un que tu n\'as pas contacté depuis 6 mois et parle 30 secondes.',
-    'Imite quelqu\'un dans ce groupe — les autres doivent deviner.',
-    'Fais 10 pompes ou bois une gorgée par pompe manquée.',
-    'Raconte la blague la plus nulle que tu connaisses avec le plus grand sérieux.',
-    'Fais semblant de pleurer en racontant un fait absolument banal.',
-    'Envoie un message mystérieux à la dernière personne de tes contacts.',
-    'Change ton statut WhatsApp pour 1h selon ce que le groupe décide.',
-    'Pose une question absurde à quelqu\'un hors du groupe (appel ou message).',
-  ],
-};
+// Les cartes vivent en base (GameContent.veriteCards.{verite,defi},
+// chargées au boot — cf. app.js et supabase_seed.sql).
 
 GameEngines['verite'] = {
 
@@ -74,7 +54,7 @@ GameEngines['verite'] = {
             </div>
           `;
           window.vtChoose = (type) => {
-            const pool = VERITE_DATA[type];
+            const pool = GameContent.veriteCards[type];
             const text = pool[Math.floor(Math.random()*pool.length)];
             const ns = { ...s, phase:'card', cardType:type, cardText:text };
             onStateChange(ns); render(ns);

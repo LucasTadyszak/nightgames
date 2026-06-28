@@ -2,13 +2,12 @@
 // games/loups.js
 // ══════════════════════════════════════
 
-const LOUP_ROLE_INFO = {
-  'Villageois':  { icon:'👨‍🌾', color:'#00aaff', desc:'Trouvez et éliminez les loups par vote !', team:'village' },
-  'Loup-Garou':  { icon:'🐺', color:'#ff3d6b', desc:'La nuit, concertez-vous pour éliminer un villageois.', team:'loups' },
-  'Voyante':     { icon:'🔮', color:'#7c3aed', desc:'Chaque nuit, découvrez le rôle d\'un joueur.', team:'village' },
-  'Sorcière':    { icon:'🧙‍♀️', color:'#00d4aa', desc:'Vous avez 2 potions : vie et mort. Une fois chacune.', team:'village' },
-  'Chasseur':    { icon:'🏹', color:'#ff9500', desc:'Si vous mourez, emmenez un joueur avec vous !', team:'village' },
-};
+// Les infos de rôle vivent en base (GameContent.loupsRoles, chargées au
+// boot — cf. app.js et supabase_seed.sql). On y accède via une fonction
+// pour centraliser le fallback 'Villageois' utilisé partout ci-dessous.
+function _loupRoleInfo(role) {
+  return GameContent.loupsRoles[role] || GameContent.loupsRoles['Villageois'];
+}
 
 function buildRolePool(n) {
   const nLoups     = Math.max(1, Math.floor(n / 4));
@@ -67,7 +66,7 @@ GameEngines['loups'] = {
         const amRevealing = me.id === currentId;
         const cp = players.find(p=>p.id===currentId);
         const myRole   = s.roles[me.id];
-        const ri       = LOUP_ROLE_INFO[myRole] || LOUP_ROLE_INFO['Villageois'];
+        const ri       = _loupRoleInfo(myRole);
         const myLoups  = myRole==='Loup-Garou' ? players.filter(p=>s.roles[p.id]==='Loup-Garou'&&p.id!==me.id) : [];
 
         if (amRevealing) {
@@ -137,7 +136,7 @@ GameEngines['loups'] = {
         if (isHost) {
           window.loupEliminate = (pid, phase) => {
             const role = s.roles[pid];
-            const ri2 = LOUP_ROLE_INFO[role]||LOUP_ROLE_INFO['Villageois'];
+            const ri2 = _loupRoleInfo(role);
             showToast(`${players.find(p=>p.id===pid)?.name} était ${ri2.icon} ${role} !`, 3000);
             const ns = {...s, alive:s.alive.filter(id=>id!==pid), phase:'night', round:s.round+1};
             setTimeout(()=>{ onStateChange(ns); render(ns); }, 1600);
@@ -176,7 +175,7 @@ GameEngines['loups'] = {
         if (isHost) {
           window.loupNightElim = (pid) => {
             const role = s.roles[pid];
-            const ri2 = LOUP_ROLE_INFO[role]||LOUP_ROLE_INFO['Villageois'];
+            const ri2 = _loupRoleInfo(role);
             showToast(`${players.find(p=>p.id===pid)?.name} était ${ri2.icon} ${role} !`, 3000);
             const ns = {...s, alive:s.alive.filter(id=>id!==pid), phase:'day'};
             setTimeout(()=>{ onStateChange(ns); render(ns); }, 1600);
@@ -206,7 +205,7 @@ GameEngines['loups'] = {
               <div class="role-desc">${isLoups?'Les loups-garous ont dominé le village…':'Le village a éliminé tous les loups !'}</div>
               <div style="margin-top:20px;display:flex;flex-direction:column;gap:6px">
                 ${players.map(p=>{
-                  const ri2=LOUP_ROLE_INFO[s.roles[p.id]]||LOUP_ROLE_INFO['Villageois'];
+                  const ri2=_loupRoleInfo(s.roles[p.id]);
                   return `<div style="display:flex;align-items:center;gap:10px;padding:8px;background:rgba(255,255,255,.04);border-radius:10px">
                     <span>${p.avatar}</span>
                     <span style="flex:1;font-weight:700">${p.name}</span>

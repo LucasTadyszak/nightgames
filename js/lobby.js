@@ -306,6 +306,20 @@ function _onRoomUpdate(room) {
 async function hostStartGame() {
   if (!Session.selectedGame) { Logger.warn('lobby', 'hostStartGame appelé sans jeu sélectionné'); return; }
 
+  // Garde-fou : initState() lit GameContent (questions/rôles/règles
+  // chargés depuis Supabase au boot) de façon synchrone. Cas rare mais
+  // possible sur réseau lent : le host clique avant la fin du chargement.
+  if (!GameContent.ready) {
+    Logger.warn('lobby', 'GameContent pas encore prêt, on attend avant de lancer la partie');
+    showToast('Chargement du contenu des jeux…');
+    try { await loadGameContent(); }
+    catch (e) {
+      Logger.error('lobby', 'Échec du chargement du contenu des jeux :', e.message || e);
+      showToast('Impossible de charger le contenu des jeux. Rechargez la page.');
+      return;
+    }
+  }
+
   const gameId = Session.selectedGame;
   const gameMeta = GAMES_META.find(g => g.id === gameId);
   Logger.info('lobby', 'Lancement de la partie :', gameId, 'avec', Session.players.length, 'joueur(s)');

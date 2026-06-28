@@ -118,18 +118,73 @@ document.querySelectorAll('[data-back]').forEach(btn => {
 // Each game must register itself here
 const GameEngines = {};
 
+// ── Contenu des jeux (questions, réponses, rôles, règles…) ───
+// Vit en base (cf. supabase_schema.sql + supabase_seed.sql) plutôt que
+// codé en dur dans chaque js/games/*.js. Chargé une fois au boot et mis
+// en cache ici : initState() reste synchrone (appelé directement au clic
+// sur "Lancer la partie"), donc chaque moteur lit GameContent au lieu de
+// faire son propre appel réseau à chaque partie.
+const GameContent = {
+  ready: false,
+  cameleonRoles: [],
+  cameleonQuestions: [],
+  veriteCards: { verite: [], defi: [] },
+  missionList: [],
+  familleCategories: [],
+  familleQuestions: [],
+  changerRules: [],
+  loupsRoles: {},
+};
+
+async function loadGameContent() {
+  Logger.info('app', 'Chargement du contenu des jeux depuis Supabase…');
+  const [cameleonRoles, cameleonQuestions, veriteCards, missionList, familleCategories, familleQuestions, changerRules, loupsRoles] =
+    await Promise.all([
+      DB.getCameleonRoles(),
+      DB.getCameleonQuestions(),
+      DB.getVeriteCards(),
+      DB.getMissionList(),
+      DB.getFamilleCategories(),
+      DB.getFamilleQuestions(),
+      DB.getChangerRules(),
+      DB.getLoupsRoles(),
+    ]);
+  Object.assign(GameContent, {
+    ready: true,
+    cameleonRoles, cameleonQuestions, veriteCards, missionList,
+    familleCategories, familleQuestions, changerRules, loupsRoles,
+  });
+  Logger.info('app', 'Contenu des jeux chargé', {
+    cameleonRoles: cameleonRoles.length,
+    cameleonQuestions: cameleonQuestions.length,
+    veriteCards: veriteCards.verite.length + veriteCards.defi.length,
+    missionList: missionList.length,
+    familleCategories: familleCategories.length,
+    familleQuestions: familleQuestions.length,
+    changerRules: changerRules.length,
+    loupsRoles: Object.keys(loupsRoles).length,
+  });
+}
+
 // ── Boot ────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
   Logger.info('app', 'Boot — initialisation du lobby');
   initLobby();
   Logger.debug('app', 'GameEngines enregistrés au boot', Object.keys(GameEngines));
 
-  // Si une session est sauvegardée (rafraîchissement de page), on
-  // rejoint directement la salle/partie en cours au lieu de revenir à
-  // l'accueil. showScreen('home') reste l'état par défaut tant que la
-  // restauration n'a pas confirmé une session valide, pour éviter un
-  // flash d'écran vide.
+  // showScreen('home') reste l'état par défaut tant que le contenu des
+  // jeux n'est pas chargé / que la restauration de session n'a pas
+  // confirmé une session valide — pas de flash d'écran vide puisque
+  // #screen-home a déjà la classe "active" dans le HTML statique.
   showScreen('home');
+
+  try {
+    await loadGameContent();
+  } catch (e) {
+    Logger.error('app', 'Échec du chargement du contenu des jeux :', e.message || e);
+    showToast('Erreur de chargement du contenu des jeux. Rechargez la page.');
+  }
+
   const restored = await tryRestoreSession();
   Logger.info('app', restored ? 'Session restaurée' : 'Aucune session à restaurer');
 });

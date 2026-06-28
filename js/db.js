@@ -151,4 +151,59 @@ const DB = {
   unsub(channel) {
     if (channel) { Logger.debug('db', 'unsub', channel.topic); _sb.removeChannel(channel); }
   },
+
+  // ── Contenu des jeux (questions, réponses, rôles, règles…) ──
+  // Lecture seule, en lecture publique (cf. supabase_schema.sql section 7).
+  // Chargé une fois au boot et mis en cache dans GameContent (app.js).
+
+  async getCameleonRoles() {
+    const { data, error } = await _sb.from('cameleon_roles').select('role, hint');
+    if (error) { Logger.error('db', 'getCameleonRoles échec', error.message); throw error; }
+    return data.map(r => ({ role: r.role, hint: r.hint }));
+  },
+
+  async getCameleonQuestions() {
+    const { data, error } = await _sb.from('cameleon_questions').select('text');
+    if (error) { Logger.error('db', 'getCameleonQuestions échec', error.message); throw error; }
+    return data.map(r => r.text);
+  },
+
+  async getVeriteCards() {
+    const { data, error } = await _sb.from('verite_cards').select('type, text');
+    if (error) { Logger.error('db', 'getVeriteCards échec', error.message); throw error; }
+    return {
+      verite: data.filter(c => c.type === 'verite').map(c => c.text),
+      defi: data.filter(c => c.type === 'defi').map(c => c.text),
+    };
+  },
+
+  async getMissionList() {
+    const { data, error } = await _sb.from('mission_list').select('text');
+    if (error) { Logger.error('db', 'getMissionList échec', error.message); throw error; }
+    return data.map(r => r.text);
+  },
+
+  async getFamilleCategories() {
+    const { data, error } = await _sb.from('famille_categories').select('id, name, icon');
+    if (error) { Logger.error('db', 'getFamilleCategories échec', error.message); throw error; }
+    return data;
+  },
+
+  async getFamilleQuestions() {
+    const { data, error } = await _sb.from('famille_questions').select('category, question, answers');
+    if (error) { Logger.error('db', 'getFamilleQuestions échec', error.message); throw error; }
+    return data.map(r => ({ cat: r.category, q: r.question, answers: r.answers }));
+  },
+
+  async getChangerRules() {
+    const { data, error } = await _sb.from('changer_rules').select('icon, name, rule, action');
+    if (error) { Logger.error('db', 'getChangerRules échec', error.message); throw error; }
+    return data;
+  },
+
+  async getLoupsRoles() {
+    const { data, error } = await _sb.from('loups_roles').select('id, icon, color, description, team');
+    if (error) { Logger.error('db', 'getLoupsRoles échec', error.message); throw error; }
+    return Object.fromEntries(data.map(r => [r.id, { icon: r.icon, color: r.color, desc: r.description, team: r.team }]));
+  },
 };
