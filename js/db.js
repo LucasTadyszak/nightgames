@@ -18,6 +18,7 @@ const DB = {
   /** Create a new lobby, returns room object */
   async createRoom(hostPlayer) {
     const code = _genCode();
+    Logger.debug('db', 'createRoom →', { code, hostId: hostPlayer.id });
     const { data, error } = await _sb
       .from('rooms')
       .insert({
@@ -28,29 +29,33 @@ const DB = {
         game_state: null,
       })
       .select().single();
-    if (error) throw error;
+    if (error) { Logger.error('db', 'createRoom échec', error.message); throw error; }
+    Logger.info('db', 'Salle créée', code, data.id);
     return data;
   },
 
   /** Get room by code */
   async getRoom(code) {
+    Logger.debug('db', 'getRoom →', code);
     const { data, error } = await _sb
       .from('rooms')
       .select('*')
       .eq('code', code.toUpperCase())
       .single();
-    if (error) throw error;
+    if (error) { Logger.warn('db', 'getRoom introuvable', code, error.message); throw error; }
     return data;
   },
 
   /** Update room fields (host only) */
   async updateRoom(roomId, fields) {
+    Logger.debug('db', 'updateRoom →', roomId, fields);
     const { error } = await _sb.from('rooms').update(fields).eq('id', roomId);
-    if (error) throw error;
+    if (error) { Logger.error('db', 'updateRoom échec', roomId, error.message); throw error; }
   },
 
   /** Delete room (cleanup) */
   async deleteRoom(roomId) {
+    Logger.info('db', 'Suppression de la salle', roomId);
     await _sb.from('players').delete().eq('room_id', roomId);
     await _sb.from('rooms').delete().eq('id', roomId);
   },
@@ -59,11 +64,13 @@ const DB = {
 
   /** Insert player into room */
   async joinRoom(roomId, player) {
+    Logger.debug('db', 'joinRoom →', roomId, player.name);
     const { data, error } = await _sb
       .from('players')
       .insert({ room_id: roomId, ...player })
       .select().single();
-    if (error) throw error;
+    if (error) { Logger.error('db', 'joinRoom échec', error.message); throw error; }
+    Logger.info('db', 'Joueur rejoint', player.name, '→', roomId);
     return data;
   },
 
@@ -74,35 +81,40 @@ const DB = {
       .select('*')
       .eq('room_id', roomId)
       .order('joined_at', { ascending: true });
-    if (error) throw error;
+    if (error) { Logger.error('db', 'getPlayers échec', roomId, error.message); throw error; }
+    Logger.debug('db', 'getPlayers', roomId, '→', data.length, 'joueur(s)');
     return data;
   },
 
   /** Remove player */
   async leaveRoom(playerId) {
+    Logger.info('db', 'leaveRoom', playerId);
     await _sb.from('players').delete().eq('id', playerId);
   },
 
   /** Update single player (score, role, etc.) */
   async updatePlayer(playerId, fields) {
+    Logger.debug('db', 'updatePlayer →', playerId, fields);
     const { error } = await _sb.from('players').update(fields).eq('id', playerId);
-    if (error) throw error;
+    if (error) { Logger.error('db', 'updatePlayer échec', playerId, error.message); throw error; }
   },
 
   // ── Realtime subscriptions ────────────────────────────────
 
   /** Subscribe to room changes (status, game_state) */
   subscribeRoom(roomId, callback) {
+    Logger.debug('db', 'subscribeRoom', roomId);
     return _sb.channel(`room:${roomId}`)
       .on('postgres_changes', {
         event: 'UPDATE', schema: 'public', table: 'rooms',
         filter: `id=eq.${roomId}`
-      }, payload => callback(payload.new))
+      }, payload => { Logger.debug('db', 'room update reçu', roomId); callback(payload.new); })
       .subscribe();
   },
 
   /** Subscribe to players list changes */
   subscribePlayers(roomId, callback) {
+    Logger.debug('db', 'subscribePlayers', roomId);
     return _sb.channel(`players:${roomId}`)
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'players',
@@ -113,6 +125,6 @@ const DB = {
 
   /** Unsubscribe channel */
   unsub(channel) {
-    if (channel) _sb.removeChannel(channel);
+    if (channel) { Logger.debug('db', 'unsub', channel.topic); _sb.removeChannel(channel); }
   },
 };

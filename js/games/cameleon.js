@@ -45,7 +45,14 @@ GameEngines['cameleon'] = {
   },
 
   mount(root, state, players, me, isHost, onStateChange, onEnd) {
+    let _sub = null;
+    // IMPORTANT : on désabonne au début de chaque render(), sinon chaque
+    // mise à jour du host empile une nouvelle souscription Realtime côté
+    // guest (fuite de listeners + rendus en double / désynchronisés).
+    const unsub = () => { if (_sub) { DB.unsub(_sub); _sub = null; } };
+
     const render = (s) => {
+      unsub();
       root.innerHTML = '';
       const myId = me.id;
       const activeId = s.activeRolePlayerId;
@@ -191,14 +198,15 @@ GameEngines['cameleon'] = {
         });
       }
 
-      // Subscribe non-host to state changes
+      // Subscribe non-host to state changes (juste re-render, jamais re-mount)
       if (!isHost) {
-        const sub = DB.subscribeRoom(Session.room.id, (room) => {
-          if (room.game_state) { DB.unsub(sub); render(room.game_state); GameEngines.cameleon.mount(root, room.game_state, players, me, isHost, onStateChange, onEnd); }
+        _sub = DB.subscribeRoom(Session.room.id, (room) => {
+          if (room.game_state) { Logger.debug('cameleon', 'État reçu du host', room.game_state.phase); render(room.game_state); }
         });
       }
     };
 
+    Logger.info('cameleon', 'mount', { isHost, players: players.length });
     render(state);
   }
 };

@@ -125,8 +125,14 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <!-- App modules -->
+  <!-- ORDRE IMPORTANT : logger.js et app.js (qui déclare le registre
+       GameEngines) doivent être chargés AVANT js/games/*.js, sinon
+       chaque GameEngines['xxx'] = {...} plante (ReferenceError: TDZ
+       sur le `const GameEngines` global) et le jeu ne se lance jamais. -->
+  <script src="js/logger.js"></script>
   <script src="js/config.js"></script>
   <script src="js/db.js"></script>
+  <script src="js/app.js"></script>
   <script src="js/lobby.js"></script>
   <script src="js/games/cameleon.js"></script>
   <script src="js/games/verite.js"></script>
@@ -134,6 +140,5 @@
   <script src="js/games/famille.js"></script>
   <script src="js/games/loups.js"></script>
   <script src="js/games/changer.js"></script>
-  <script src="js/app.js"></script>
 </body>
 </html>

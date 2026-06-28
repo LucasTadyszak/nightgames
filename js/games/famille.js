@@ -30,6 +30,7 @@ GameEngines['famille'] = {
   },
 
   mount(root, state, players, me, isHost, onStateChange, onEnd) {
+    Logger.info('famille', 'mount', { isHost, players: players.length });
     let _sub = null;
     const unsub = () => { if (_sub) { DB.unsub(_sub); _sub = null; } };
 

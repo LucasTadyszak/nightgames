@@ -33,7 +33,12 @@ function shuffle(arr) {
 }
 
 // ── Scoreboard renderer ────────────────────────────────────
+// IMPORTANT : on attache les handlers via addEventListener, jamais via
+// onclick="(${fn})()". Sérialiser une fonction en string lui fait perdre
+// son scope de closure (ex: `players`, `onStateChange`, `render` ne sont
+// plus accessibles) -> ReferenceError silencieux au clic.
 function renderScoreboard(container, players, scores, { onReplay, onHome }) {
+  Logger.debug('scoreboard', 'render', { players: players.length, scores });
   const sorted = players
     .map(p => ({ ...p, score: scores[p.id] || 0 }))
     .sort((a, b) => b.score - a.score);
@@ -61,10 +66,21 @@ function renderScoreboard(container, players, scores, { onReplay, onHome }) {
           </div>
         `).join('')}
       </div>
-      ${onReplay ? `<button class="btn-primary" onclick="(${onReplay})()">🔄 REJOUER</button>` : ''}
-      <button class="btn-secondary" onclick="(${onHome})()">🏠 Retour au lobby</button>
+      ${onReplay ? `<button class="btn-primary" id="sb-btn-replay">🔄 REJOUER</button>` : ''}
+      <button class="btn-secondary" id="sb-btn-home">🏠 Retour au lobby</button>
     </div>
   `;
+
+  if (onReplay) {
+    container.querySelector('#sb-btn-replay').addEventListener('click', () => {
+      Logger.info('scoreboard', 'Rejouer cliqué');
+      onReplay();
+    });
+  }
+  container.querySelector('#sb-btn-home').addEventListener('click', () => {
+    Logger.info('scoreboard', 'Retour au lobby cliqué');
+    onHome();
+  });
 }
 
 // ── Back buttons ────────────────────────────────────────────
@@ -78,6 +94,12 @@ const GameEngines = {};
 
 // ── Boot ────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+  Logger.info('app', 'Boot — initialisation du lobby');
   initLobby();
   showScreen('home');
+  Logger.debug('app', 'GameEngines enregistrés au boot', Object.keys(GameEngines));
+});
+
+window.addEventListener('error', (e) => {
+  Logger.error('app', 'Erreur JS non interceptée', e.message, e.filename + ':' + e.lineno);
 });

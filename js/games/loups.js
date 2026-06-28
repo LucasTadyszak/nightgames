@@ -46,11 +46,13 @@ GameEngines['loups'] = {
   },
 
   mount(root, state, players, me, isHost, onStateChange, onEnd) {
+    Logger.info('loups', 'mount', { isHost, players: players.length });
     let _sub = null;
     const unsub = () => { if (_sub) { DB.unsub(_sub); _sub = null; } };
 
     const render = (s) => {
       unsub();
+      Logger.debug('loups', 'render phase=', s.phase, 'round=', s.round);
       root.innerHTML='';
 
       const g = { g1:'#1e3a8a', g2:'#00aaff' };
@@ -105,8 +107,8 @@ GameEngines['loups'] = {
         }
 
       } else if (s.phase === 'day') {
-        if (nLoups >= nVillage) { const ns={...s,phase:'end',winner:'loups'}; onStateChange(ns); render(ns); return; }
-        if (nLoups === 0)       { const ns={...s,phase:'end',winner:'village'}; onStateChange(ns); render(ns); return; }
+        if (nLoups >= nVillage) { Logger.info('loups', 'Victoire des loups (jour)'); const ns={...s,phase:'end',winner:'loups'}; onStateChange(ns); render(ns); return; }
+        if (nLoups === 0)       { Logger.info('loups', 'Victoire du village (jour)'); const ns={...s,phase:'end',winner:'village'}; onStateChange(ns); render(ns); return; }
 
         root.innerHTML=`
           <div class="game-header"><div class="game-title">☀️ Phase de Jour — Manche ${s.round+1}</div></div>
@@ -215,10 +217,13 @@ GameEngines['loups'] = {
               </div>
             </div>
             ${isHost?`<button class="btn-primary" style="--g1:#1e3a8a;--g2:#00aaff" onclick="loupReplay()">🐺 NOUVELLE PARTIE</button>`:''}
-            <button class="btn-secondary" onclick="(${onEnd})()">🏠 Retour au lobby</button>
+            <button class="btn-secondary" id="loup-btn-home">🏠 Retour au lobby</button>
           </div>
         `;
-        if (isHost) window.loupReplay = () => { const ns=GameEngines.loups.initState(players); onStateChange(ns); render(ns); };
+        // `onclick="(${onEnd})()"` sérialise la closure et perd ses
+        // variables capturées -> on l'attache en JS comme les autres boutons.
+        root.querySelector('#loup-btn-home').addEventListener('click', () => { Logger.info('loups', 'Retour au lobby'); onEnd(); });
+        if (isHost) window.loupReplay = () => { Logger.info('loups', 'Nouvelle partie'); const ns=GameEngines.loups.initState(players); onStateChange(ns); render(ns); };
       }
 
       if (!isHost) {

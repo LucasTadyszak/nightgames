@@ -93,6 +93,7 @@ async function confirmName() {
 // CREATE ROOM
 // ══════════════════════════════════════
 async function doCreateRoom(playerId, name, avatar) {
+  Logger.info('lobby', 'Création de salle par', name);
   // Create the room first
   const tempPlayer = { id: playerId };
   const room = await DB.createRoom(tempPlayer);
@@ -112,9 +113,10 @@ async function doCreateRoom(playerId, name, avatar) {
 // JOIN ROOM
 // ══════════════════════════════════════
 async function doJoinRoom(code, playerId, name, avatar) {
+  Logger.info('lobby', name, 'tente de rejoindre la salle', code);
   const room = await DB.getRoom(code);
-  if (!room) throw new Error('Salle introuvable');
-  if (room.status !== 'waiting') throw new Error('La partie a déjà commencé');
+  if (!room) { Logger.warn('lobby', 'Salle introuvable', code); throw new Error('Salle introuvable'); }
+  if (room.status !== 'waiting') { Logger.warn('lobby', 'Salle déjà en cours', code); throw new Error('La partie a déjà commencé'); }
 
   const me = await DB.joinRoom(room.id, {
     id: playerId, name, avatar, score: 0, role: null, is_host: false
@@ -165,6 +167,7 @@ function _renderGamesPicker() {
 }
 
 function selectGame(id) {
+  Logger.info('lobby', 'Jeu sélectionné :', id);
   Session.selectedGame = id;
   document.querySelectorAll('.game-pick-btn').forEach(b => {
     b.classList.toggle('selected', b.dataset.game === id);
@@ -218,25 +221,47 @@ function _onRoomUpdate(room) {
 // HOST: START GAME
 // ══════════════════════════════════════
 async function hostStartGame() {
-  if (!Session.selectedGame) return;
+  if (!Session.selectedGame) { Logger.warn('lobby', 'hostStartGame appelé sans jeu sélectionné'); return; }
 
   const gameId = Session.selectedGame;
   const gameMeta = GAMES_META.find(g => g.id === gameId);
+  Logger.info('lobby', 'Lancement de la partie :', gameId, 'avec', Session.players.length, 'joueur(s)');
 
-  // Build initial game state
-  const initialState = GameEngines[gameId].initState(Session.players);
+  const engine = GameEngines[gameId];
+  if (!engine) {
+    // Si ça arrive, c'est presque toujours un problème d'ordre de
+    // chargement des scripts dans index.html (GameEngines doit être
+    // déclaré avant js/games/*.js).
+    Logger.error('lobby', `Aucun GameEngine enregistré pour "${gameId}". Moteurs disponibles :`, Object.keys(GameEngines));
+    showToast('Erreur : ce jeu n\'a pas pu être chargé. Rechargez la page.');
+    return;
+  }
 
-  await DB.updateRoom(Session.room.id, {
-    status: 'playing',
-    game: gameId,
-    game_state: initialState,
-  });
+  const btn = document.getElementById('btn-start-game');
+  try {
+    btn.disabled = true;
 
-  // Host also launches (already have state)
-  _launchGame(gameId, initialState);
+    // Build initial game state
+    const initialState = engine.initState(Session.players);
+    Logger.debug('lobby', 'État initial généré pour', gameId, initialState);
+
+    await DB.updateRoom(Session.room.id, {
+      status: 'playing',
+      game: gameId,
+      game_state: initialState,
+    });
+
+    // Host also launches (already have state)
+    _launchGame(gameId, initialState);
+  } catch (e) {
+    Logger.error('lobby', 'hostStartGame a échoué :', e.message || e);
+    showToast('Impossible de lancer la partie : ' + (e.message || 'erreur inconnue'));
+    btn.disabled = false;
+  }
 }
 
 function _launchGame(gameId, state) {
+  Logger.debug('lobby', '_launchGame', gameId);
   DB.unsub(Session.roomSub);
   DB.unsub(Session.playersSub);
 
@@ -250,11 +275,15 @@ function _launchGame(gameId, state) {
     // onStateChange — host pushes new state
     async (newState) => {
       if (Session.isHost) {
-        await DB.updateRoom(Session.room.id, { game_state: newState });
+        try {
+          await DB.updateRoom(Session.room.id, { game_state: newState });
+        } catch (e) {
+          Logger.error('lobby', 'Échec de la synchronisation de l\'état du jeu :', e.message || e);
+        }
       }
     },
     // onEnd
-    () => { showScreen('lobby'); _enterLobby(); }
+    () => { Logger.info('lobby', 'Retour au lobby depuis', gameId); showScreen('lobby'); _enterLobby(); }
   );
 }
 
