@@ -61,6 +61,12 @@ GameEngines['cameleon'] = {
       const activeAvatar = players.find(p => p.id === activeId)?.avatar || '?';
 
       if (s.phase === 'show_role') {
+        // IMPORTANT : le bouton pour avancer ("tout le monde a lu") doit
+        // être visible par le HOST quel qu'il soit — y compris quand le
+        // rôle secret tombe sur un invité (amActive=false pour le host).
+        // Avant, ce bouton n'existait que si le joueur actif ÉTAIT le host
+        // (amActive && isHost imbriqués), donc dès que le rôle tombait sur
+        // un invité, plus personne ne pouvait jamais cliquer pour continuer.
         if (amActive) {
           // Show MY role
           root.innerHTML = `
@@ -83,15 +89,11 @@ GameEngines['cameleon'] = {
                 Les autres vont essayer de deviner ton rôle !
               </div>
               ${isHost ? `<button class="btn-primary" style="--g1:#7c3aed;--g2:#00aaff"
-                onclick="cameleonHostReveal()">TOUT LE MONDE A LU → DEVINER</button>` : ''}
+                onclick="cameleonHostReveal()">TOUT LE MONDE A LU → DEVINER</button>` : `<div class="guest-waiting"><div class="pulse-dot"></div>Attends que le host lance la phase de devine…</div>`}
             </div>
           `;
-          if (isHost) window.cameleonHostReveal = () => {
-            const ns = { ...s, phase: 'guessing' };
-            onStateChange(ns); render(ns);
-          };
         } else {
-          // Waiting screen for other players
+          // Waiting screen for other players (+ bouton host pour avancer)
           root.innerHTML = `
             <div class="game-header"><div class="game-title">🦎 Caméléon</div></div>
             <div class="waiting-screen">
@@ -99,8 +101,14 @@ GameEngines['cameleon'] = {
               <div class="waiting-title">${activeAvatar} ${activeName}</div>
               <div class="waiting-sub">lit son rôle secret…<br>Fermez les yeux !</div>
             </div>
+            ${isHost ? `<div style="padding:0 24px"><button class="btn-primary" style="--g1:#7c3aed;--g2:#00aaff"
+              onclick="cameleonHostReveal()">TOUT LE MONDE A LU → DEVINER</button></div>` : ''}
           `;
         }
+        if (isHost) window.cameleonHostReveal = () => {
+          const ns = { ...s, phase: 'guessing' };
+          onStateChange(ns); render(ns);
+        };
 
       } else if (s.phase === 'guessing') {
         // Everyone sees the question and can guess
