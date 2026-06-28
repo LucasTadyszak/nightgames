@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>NightGames 🎉</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Syne:wght@400;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- ══════════════════════════════════════
+       SCREEN: HOME
+  ══════════════════════════════════════ -->
+  <div id="screen-home" class="screen active">
+    <div class="home-bg-glow"></div>
+    <header class="home-header">
+      <div class="logo">NIGHTGAMES</div>
+      <div class="tagline">La soirée commence ici</div>
+    </header>
+
+    <main class="home-main">
+      <button class="btn-hero" id="btn-create-lobby">
+        <span class="btn-hero-icon">🎮</span>
+        <div>
+          <div class="btn-hero-title">CRÉER UNE SALLE</div>
+          <div class="btn-hero-sub">Tu seras le host de la soirée</div>
+        </div>
+        <span class="btn-hero-arrow">›</span>
+      </button>
+
+      <div class="divider-text">ou</div>
+
+      <div class="join-block">
+        <div class="join-label">Rejoindre avec un code</div>
+        <div class="join-input-row">
+          <input id="join-code-input" class="code-input" type="text"
+            placeholder="XXXX" maxlength="4" autocomplete="off"
+            oninput="this.value=this.value.toUpperCase()">
+          <button class="btn-join" id="btn-join-lobby">GO</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       SCREEN: NAME ENTRY (join flow)
+  ══════════════════════════════════════ -->
+  <div id="screen-name" class="screen">
+    <div class="screen-header">
+      <button class="btn-back" data-back="home">← Retour</button>
+      <div class="screen-title" id="name-screen-title">Rejoindre la salle</div>
+    </div>
+    <div class="screen-body">
+      <div class="name-avatar-row" id="avatar-picker">
+        <!-- avatars injected by JS -->
+      </div>
+      <input id="player-name-input" class="text-input" type="text"
+        placeholder="Ton prénom" maxlength="16" autocomplete="off">
+      <button class="btn-primary" id="btn-confirm-name">ENTRER DANS LA SALLE ›</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       SCREEN: LOBBY (waiting room)
+  ══════════════════════════════════════ -->
+  <div id="screen-lobby" class="screen">
+    <div class="screen-header">
+      <button class="btn-back" id="btn-leave-lobby">← Quitter</button>
+      <div class="screen-title">Salle d'attente</div>
+    </div>
+    <div class="screen-body">
+
+      <!-- Room code display -->
+      <div class="room-code-card">
+        <div class="room-code-label">CODE DE LA SALLE</div>
+        <div class="room-code" id="room-code-display">----</div>
+        <div class="room-code-hint">Partage ce code à tes amis</div>
+        <button class="btn-copy" id="btn-copy-code">📋 Copier</button>
+      </div>
+
+      <!-- Players list -->
+      <div class="lobby-section-title">
+        <span>JOUEURS</span>
+        <span id="player-count" class="player-count-badge">0</span>
+      </div>
+      <div class="players-grid" id="lobby-players-grid">
+        <!-- injected -->
+      </div>
+
+      <!-- Game picker (host only) -->
+      <div id="host-controls" class="host-controls hidden">
+        <div class="lobby-section-title">CHOISIR UN JEU</div>
+        <div class="games-picker" id="games-picker">
+          <!-- injected -->
+        </div>
+        <button class="btn-primary" id="btn-start-game" disabled>
+          LANCER LA PARTIE
+        </button>
+        <div class="min-players-hint" id="min-players-hint"></div>
+      </div>
+
+      <!-- Guest waiting -->
+      <div id="guest-waiting" class="guest-waiting hidden">
+        <div class="pulse-dot"></div>
+        <div>En attente du host…</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       SCREEN: GAME (injected dynamically)
+  ══════════════════════════════════════ -->
+  <div id="screen-game" class="screen">
+    <div id="game-root"></div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       TOAST
+  ══════════════════════════════════════ -->
+  <div class="toast" id="toast"></div>
+
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- App modules -->
+  <script src="js/config.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/lobby.js"></script>
+  <script src="js/games/cameleon.js"></script>
+  <script src="js/games/verite.js"></script>
+  <script src="js/games/mission.js"></script>
+  <script src="js/games/famille.js"></script>
+  <script src="js/games/loups.js"></script>
+  <script src="js/games/changer.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
