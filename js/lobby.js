@@ -364,7 +364,21 @@ function _launchGame(gameId, state) {
         }
       },
       // onEnd
-      () => { Logger.info('lobby', 'Retour au lobby depuis', gameId); showScreen('lobby'); _enterLobby(); }
+      () => {
+        Logger.info('lobby', 'Retour au lobby depuis', gameId);
+        // Seul le host réinitialise la salle en base (status/game/game_state).
+        // Sans ça, room.status reste 'playing' avec l'ancienne partie : tout
+        // event realtime ultérieur — ou un simple rafraîchissement de page via
+        // tryRestoreSession() — relance l'ancienne partie déjà terminée au
+        // lieu d'afficher le lobby (et peut faire planter le moteur de jeu
+        // qui reçoit un état périmé / une forme de state plus ancienne).
+        if (Session.isHost) {
+          DB.updateRoom(Session.room.id, { status: 'waiting', game: null, game_state: null })
+            .catch(e => Logger.error('lobby', 'Échec de la réinitialisation de la salle :', e.message || e));
+        }
+        showScreen('lobby');
+        _enterLobby();
+      }
     );
   } catch (e) {
     Logger.error('lobby', `mount() de "${gameId}" a levé une exception :`, e.message || e, e.stack);
