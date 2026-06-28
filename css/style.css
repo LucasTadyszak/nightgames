@@ -496,6 +496,39 @@ body::before {
 }
 .btn-quit-game:active { transform: scale(.92); color: var(--text); }
 
+/* Confirm modal — remplace window.confirm(), pour un rendu cohérent et
+   de grandes zones tactiles sur mobile. */
+.confirm-modal-backdrop {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,.6);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+  backdrop-filter: blur(2px);
+}
+.confirm-modal-backdrop.hidden { display: none; }
+.confirm-modal-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-lg); padding: 24px;
+  width: 100%; max-width: 360px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.4);
+}
+.confirm-modal-title {
+  font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 1px;
+  margin-bottom: 10px; text-align: center;
+}
+.confirm-modal-text {
+  font-size: 14px; color: var(--muted); text-align: center;
+  line-height: 1.5; margin-bottom: 22px;
+}
+.confirm-modal-actions {
+  display: flex; flex-direction: column; gap: 10px;
+}
+/* Sur mobile on garde les boutons empilés (faciles à toucher au pouce) ;
+   sur écran large, côte à côte. */
+@media (min-width: 480px) {
+  .confirm-modal-actions { flex-direction: row-reverse; }
+}
+
 .btn-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 
 /* Section label */

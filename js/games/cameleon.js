@@ -76,15 +76,13 @@ GameEngines['cameleon'] = {
     };
   },
 
+  // mount() retourne sa fonction render : lobby.js gère UN SEUL abonnement
+  // Realtime par partie (et non un par jeu) et la rappelle à chaque mise à
+  // jour reçue, pour éviter de recréer/détruire des canaux Supabase à
+  // chaque rendu (cause de "cannot add postgres_changes callbacks ...
+  // after subscribe()" — removeChannel() est asynchrone côté supabase-js).
   mount(root, state, players, me, isHost, onStateChange, onEnd) {
-    let _sub = null;
-    // IMPORTANT : on désabonne au début de chaque render(), sinon chaque
-    // mise à jour empile une nouvelle souscription Realtime (fuite de
-    // listeners + rendus en double / désynchronisés).
-    const unsub = () => { if (_sub) { DB.unsub(_sub); _sub = null; } };
-
     const render = (s) => {
-      unsub();
       // Tolère un state persisté par une version antérieure du jeu
       // (avant l'ajout de guesses/options/revealed) pour ne pas planter
       // sur une partie déjà en cours au moment de la mise à jour.
@@ -284,19 +282,10 @@ GameEngines['cameleon'] = {
         });
       }
 
-      // Tout le monde s'abonne aux mises à jour temps réel — pas que les
-      // invités. Depuis que n'importe quel joueur non-actif peut écrire son
-      // propre guess (pas seulement le host), le host doit aussi être
-      // notifié pour voir l'avancée des devines des invités en direct.
-      _sub = DB.subscribeRoom(Session.room.id, (room) => {
-        if (!room.game_state) return;
-        Logger.debug('cameleon', 'État reçu', room.game_state.phase);
-        try { render(room.game_state); }
-        catch (e) { Logger.error('cameleon', 'render() a échoué sur update realtime :', e.message, e.stack); showFatalError(e.message); }
-      });
     };
 
     Logger.info('cameleon', 'mount', { isHost, players: players.length });
     render(state);
+    return render;
   }
 };

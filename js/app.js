@@ -23,6 +23,31 @@ function showToast(msg, duration = 2500) {
   _toastTimer = setTimeout(() => t.classList.remove('show'), duration);
 }
 
+// ── Confirm modal (remplace window.confirm) ─────────────────
+// window.confirm() est bloquant, mal stylé et parfois silencieusement
+// ignoré dans certaines webviews mobiles. On affiche notre propre popup,
+// avec de grandes zones tactiles, cohérente avec le reste de l'app.
+function showConfirm(title, text, onConfirm) {
+  const modal  = document.getElementById('confirm-modal');
+  const btnOk  = document.getElementById('confirm-modal-ok');
+  const btnNo  = document.getElementById('confirm-modal-cancel');
+
+  document.getElementById('confirm-modal-title').textContent = title;
+  document.getElementById('confirm-modal-text').textContent  = text;
+  modal.classList.remove('hidden');
+
+  // On clone les boutons pour repartir d'écouteurs propres à chaque appel
+  // (sinon les clics précédents s'accumuleraient sur le même bouton).
+  const freshOk = btnOk.cloneNode(true);
+  const freshNo = btnNo.cloneNode(true);
+  btnOk.replaceWith(freshOk);
+  btnNo.replaceWith(freshNo);
+
+  const close = () => modal.classList.add('hidden');
+  freshOk.addEventListener('click', () => { close(); onConfirm(); });
+  freshNo.addEventListener('click', close);
+}
+
 // ── Shuffle ────────────────────────────────────────────────
 function shuffle(arr) {
   const a = [...arr];

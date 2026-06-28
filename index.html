@@ -122,6 +122,21 @@
   ══════════════════════════════════════ -->
   <div class="toast" id="toast"></div>
 
+  <!-- ══════════════════════════════════════
+       CONFIRM MODAL (remplace window.confirm — moche et non stylé
+       sur mobile, et bloque parfois silencieusement dans des webviews)
+  ══════════════════════════════════════ -->
+  <div id="confirm-modal" class="confirm-modal-backdrop hidden">
+    <div class="confirm-modal-card">
+      <div class="confirm-modal-title" id="confirm-modal-title"></div>
+      <div class="confirm-modal-text" id="confirm-modal-text"></div>
+      <div class="confirm-modal-actions">
+        <button class="btn-secondary" id="confirm-modal-cancel">Annuler</button>
+        <button class="btn-primary" id="confirm-modal-ok" style="--g1:#ff3d6b;--g2:#ff9500">Confirmer</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Supabase CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 

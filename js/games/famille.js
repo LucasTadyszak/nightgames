@@ -29,13 +29,13 @@ GameEngines['famille'] = {
     };
   },
 
+  // mount() retourne sa fonction render : lobby.js gère UN SEUL abonnement
+  // Realtime par partie et la rappelle à chaque mise à jour reçue (voir
+  // cameleon.js pour le détail du bug que ça évite).
   mount(root, state, players, me, isHost, onStateChange, onEnd) {
     Logger.info('famille', 'mount', { isHost, players: players.length });
-    let _sub = null;
-    const unsub = () => { if (_sub) { DB.unsub(_sub); _sub = null; } };
 
     const render = (s) => {
-      unsub();
       root.innerHTML = '';
       const g = { g1:'#ff9500', g2:'#ff3d6b' };
 
@@ -117,16 +117,9 @@ GameEngines['famille'] = {
         });
       }
 
-      if (!isHost) {
-        _sub = DB.subscribeRoom(Session.room.id, (room) => {
-          if (!room.game_state) return;
-          Logger.debug('famille', 'État reçu', room.game_state.phase);
-          try { render(room.game_state); }
-          catch (e) { Logger.error('famille', 'render() a échoué sur update realtime :', e.message, e.stack); showFatalError(e.message); }
-        });
-      }
     };
 
     render(state);
+    return render;
   }
 };

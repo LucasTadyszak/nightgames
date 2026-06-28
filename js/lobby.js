@@ -21,6 +21,7 @@ const Session = {
   selectedGame: null,
   roomSub: null,
   playersSub: null,
+  gameSub: null,     // abonnement Realtime unique pour la partie en cours
   players: [],
 };
 
@@ -114,8 +115,11 @@ function initLobby() {
   // Bouton "✕" toujours visible pendant le jeu (cf. index.html), peu
   // importe quel moteur de jeu est monté dans #game-root.
   document.getElementById('btn-quit-game').onclick = () => {
-    const ok = confirm('Terminer la partie en cours et revenir au lobby ?');
-    if (ok) quitGame(Session.room?.game);
+    showConfirm(
+      '🏁 Terminer la partie ?',
+      'Tout le monde reviendra au lobby. La partie en cours sera perdue.',
+      () => quitGame(Session.room?.game)
+    );
   };
 }
 
@@ -347,6 +351,8 @@ async function hostStartGame() {
 // ══════════════════════════════════════
 function quitGame(gameId) {
   Logger.info('lobby', 'Retour au lobby depuis', gameId || Session.room?.game);
+  DB.unsub(Session.gameSub);
+  Session.gameSub = null;
   // Seul le host réinitialise la salle en base (status/game/game_state).
   // Sans ça, room.status reste 'playing' avec l'ancienne partie : tout
   // event realtime ultérieur — ou un simple rafraîchissement de page via
@@ -365,11 +371,23 @@ function _launchGame(gameId, state) {
   Logger.debug('lobby', '_launchGame', gameId);
   DB.unsub(Session.roomSub);
   DB.unsub(Session.playersSub);
+  DB.unsub(Session.gameSub);
+  Session.gameSub = null;
 
   showScreen('game');
   clearFatalError();
   try {
-    GameEngines[gameId].mount(
+    // IMPORTANT : un seul abonnement Realtime par partie, géré ICI.
+    // Avant, chaque moteur de jeu se désabonnait puis se réabonnait sur le
+    // même canal (`room:<roomId>`) à CHAQUE rendu. `removeChannel()` est
+    // asynchrone côté supabase-js : si on recrée un canal de même nom avant
+    // que l'ancien soit vraiment retiré, la lib renvoie l'ancien objet déjà
+    // "subscribed", et y rajouter un listener .on() lève :
+    // "cannot add postgres_changes callbacks ... after subscribe()".
+    // En ne s'abonnant qu'UNE fois par partie (et en redirigeant chaque
+    // mise à jour vers le `render()` courant du moteur via la valeur
+    // retournée par mount()), ce problème disparaît structurellement.
+    const handleExternalUpdate = GameEngines[gameId].mount(
       document.getElementById('game-root'),
       state,
       Session.players,
@@ -395,6 +413,20 @@ function _launchGame(gameId, state) {
       // onEnd
       () => quitGame(gameId)
     );
+
+    if (typeof handleExternalUpdate === 'function') {
+      Session.gameSub = DB.subscribeRoom(Session.room.id, (room) => {
+        if (!room.game_state) return;
+        Logger.debug('lobby', 'État de jeu reçu (realtime)', gameId, room.game_state.phase);
+        try { handleExternalUpdate(room.game_state); }
+        catch (e) {
+          Logger.error('lobby', `Échec du re-rendu de "${gameId}" sur update realtime :`, e.message, e.stack);
+          showFatalError(e.message);
+        }
+      });
+    } else {
+      Logger.warn('lobby', `GameEngines['${gameId}'].mount() ne retourne pas de fonction de mise à jour — les autres joueurs ne verront pas les changements en direct.`);
+    }
   } catch (e) {
     Logger.error('lobby', `mount() de "${gameId}" a levé une exception :`, e.message || e, e.stack);
     showFatalError(e.message || String(e));
@@ -413,6 +445,8 @@ function copyCode() {
 async function leaveLobby() {
   DB.unsub(Session.roomSub);
   DB.unsub(Session.playersSub);
+  DB.unsub(Session.gameSub);
+  Session.gameSub = null;
   if (Session.me) await DB.leaveRoom(Session.me.id);
   if (Session.isHost) await DB.deleteRoom(Session.room.id);
   Session.room = null; Session.me = null;

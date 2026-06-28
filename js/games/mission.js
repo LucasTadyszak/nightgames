@@ -35,13 +35,13 @@ GameEngines['mission'] = {
     };
   },
 
+  // mount() retourne sa fonction render : lobby.js gère UN SEUL abonnement
+  // Realtime par partie et la rappelle à chaque mise à jour reçue (voir
+  // cameleon.js pour le détail du bug que ça évite).
   mount(root, state, players, me, isHost, onStateChange, onEnd) {
     Logger.info('mission', 'mount', { isHost, players: players.length });
-    let _sub = null;
-    const unsub = () => { if (_sub) { DB.unsub(_sub); _sub = null; } };
 
     const render = (s) => {
-      unsub();
       root.innerHTML = '';
       const g = { color:'#00d4aa', g1:'#00d4aa', g2:'#00aaff' };
 
@@ -151,16 +151,9 @@ GameEngines['mission'] = {
         });
       }
 
-      // Tout le monde s'abonne : missionAccept peut être déclenché par un
-      // invité actif (pas que le host), le host doit donc aussi être notifié.
-      _sub = DB.subscribeRoom(Session.room.id, (room) => {
-        if (!room.game_state) return;
-        Logger.debug('mission', 'État reçu', room.game_state.phase);
-        try { render(room.game_state); }
-        catch (e) { Logger.error('mission', 'render() a échoué sur update realtime :', e.message, e.stack); showFatalError(e.message); }
-      });
     };
 
     render(state);
+    return render;
   }
 };
