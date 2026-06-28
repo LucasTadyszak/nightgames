@@ -22,6 +22,29 @@ const CAMELEON_QUESTIONS = [
   'Décris ta journée comme si c\'était un film.',
 ];
 
+function _cameleonOptionsFor(role) {
+  const wrongOptions = shuffle(CAMELEON_ROLES.filter(r => r.role !== role.role)).slice(0, 3);
+  return shuffle([role, ...wrongOptions]).map(o => o.role);
+}
+
+// Calcule les scores une fois que la révélation est déclenchée :
+// +1 par invité ayant correctement deviné, +2 au joueur actif si personne
+// n'a trouvé.
+function _cameleonReveal(s, players) {
+  const scores = { ...s.scores };
+  let anyCorrect = false;
+  Object.entries(s.guesses).forEach(([playerId, guess]) => {
+    if (guess === s.role.role) {
+      scores[playerId] = (scores[playerId] || 0) + 1;
+      anyCorrect = true;
+    }
+  });
+  if (!anyCorrect) {
+    scores[s.activeRolePlayerId] = (scores[s.activeRolePlayerId] || 0) + 2;
+  }
+  return { ...s, scores, revealed: true };
+}
+
 GameEngines['cameleon'] = {
 
   initState(players) {
@@ -39,7 +62,9 @@ GameEngines['cameleon'] = {
       question,
       activeRolePlayerId,
       scores,
-      guessResult: null,
+      options: [],         // choix multiples affichés pendant 'guessing' (générés une fois par tour)
+      guesses: {},         // playerId -> rôle deviné (un par joueur non-actif)
+      revealed: false,
       totalRounds: players.length * 2,
     };
   },
@@ -47,8 +72,8 @@ GameEngines['cameleon'] = {
   mount(root, state, players, me, isHost, onStateChange, onEnd) {
     let _sub = null;
     // IMPORTANT : on désabonne au début de chaque render(), sinon chaque
-    // mise à jour du host empile une nouvelle souscription Realtime côté
-    // guest (fuite de listeners + rendus en double / désynchronisés).
+    // mise à jour empile une nouvelle souscription Realtime (fuite de
+    // listeners + rendus en double / désynchronisés).
     const unsub = () => { if (_sub) { DB.unsub(_sub); _sub = null; } };
 
     const render = (s) => {
@@ -59,16 +84,13 @@ GameEngines['cameleon'] = {
       const amActive = myId === activeId;
       const activeName = players.find(p => p.id === activeId)?.name || '?';
       const activeAvatar = players.find(p => p.id === activeId)?.avatar || '?';
+      const nonActivePlayers = players.filter(p => p.id !== activeId);
 
       if (s.phase === 'show_role') {
-        // IMPORTANT : le bouton pour avancer ("tout le monde a lu") doit
-        // être visible par le HOST quel qu'il soit — y compris quand le
-        // rôle secret tombe sur un invité (amActive=false pour le host).
-        // Avant, ce bouton n'existait que si le joueur actif ÉTAIT le host
-        // (amActive && isHost imbriqués), donc dès que le rôle tombait sur
-        // un invité, plus personne ne pouvait jamais cliquer pour continuer.
+        // Le bouton pour avancer ("tout le monde a lu") doit être visible
+        // par le HOST quel qu'il soit — y compris quand le rôle secret
+        // tombe sur un invité (amActive=false pour le host).
         if (amActive) {
-          // Show MY role
           root.innerHTML = `
             <div class="game-header">
               <div class="game-title">🦎 Caméléon</div>
@@ -93,7 +115,6 @@ GameEngines['cameleon'] = {
             </div>
           `;
         } else {
-          // Waiting screen for other players (+ bouton host pour avancer)
           root.innerHTML = `
             <div class="game-header"><div class="game-title">🦎 Caméléon</div></div>
             <div class="waiting-screen">
@@ -106,34 +127,40 @@ GameEngines['cameleon'] = {
           `;
         }
         if (isHost) window.cameleonHostReveal = () => {
-          const ns = { ...s, phase: 'guessing' };
+          const ns = { ...s, phase: 'guessing', options: _cameleonOptionsFor(s.role), guesses: {}, revealed: false };
           onStateChange(ns); render(ns);
         };
 
       } else if (s.phase === 'guessing') {
-        // Everyone sees the question and can guess
-        // Only host controls the result
-        const wrongOptions = shuffle(CAMELEON_ROLES.filter(r => r.role !== s.role.role)).slice(0,3);
-        const options = shuffle([s.role, ...wrongOptions]);
-
-        if (s.guessResult !== null) {
-          // Result revealed
-          const correct = s.guessResult;
+        if (s.revealed) {
+          // ── Résultats : qui a deviné quoi, et qui a eu juste ──
           root.innerHTML = `
             <div class="game-header"><div class="game-title">🦎 Caméléon</div></div>
             <div class="game-body slide-up">
-              <div class="challenge-card" style="--card-color:${correct?'#00d4aa':'#ff3d6b'}">
-                <div class="challenge-type">${correct ? '✅ BIEN DEVINÉ !' : '❌ RATÉ !'}</div>
-                <div class="challenge-text">Le rôle était :<br><strong>${s.role.role}</strong></div>
+              <div class="challenge-card" style="--card-color:#7c3aed">
+                <div class="challenge-type">🦎 LE RÔLE ÉTAIT</div>
+                <div class="challenge-text"><strong>${s.role.role}</strong></div>
               </div>
               <div class="score-list">
-                ${players.map(p => `
-                  <div class="score-row">
-                    <div style="font-size:20px">${p.avatar}</div>
-                    <div class="score-info"><div class="score-name">${p.name}</div></div>
-                    <div class="score-pts">${s.scores[p.id] || 0}</div>
-                  </div>
-                `).join('')}
+                ${nonActivePlayers.map(p => {
+                  const guess = s.guesses[p.id];
+                  const correct = guess === s.role.role;
+                  return `
+                    <div class="score-row">
+                      <div style="font-size:20px">${p.avatar}</div>
+                      <div class="score-info">
+                        <div class="score-name">${p.name}</div>
+                        <div style="font-size:11px;color:var(--muted)">${guess ? (correct ? `✅ ${guess}` : `❌ ${guess}`) : '⏳ n\'a pas répondu'}</div>
+                      </div>
+                      <div class="score-pts">${s.scores[p.id] || 0}</div>
+                    </div>
+                  `;
+                }).join('')}
+                <div class="score-row" style="opacity:.8">
+                  <div style="font-size:20px">${activeAvatar}</div>
+                  <div class="score-info"><div class="score-name">${activeName} (caméléon)</div></div>
+                  <div class="score-pts">${s.scores[activeId] || 0}</div>
+                </div>
               </div>
               ${isHost ? `<button class="btn-primary" style="--g1:#7c3aed;--g2:#00aaff"
                 onclick="cameleonNext()">TOUR SUIVANT →</button>` : `<div class="guest-waiting"><div class="pulse-dot"></div>Attente du host…</div>`}
@@ -142,17 +169,23 @@ GameEngines['cameleon'] = {
           if (isHost) window.cameleonNext = () => {
             const newTurn = s.turn + 1;
             if (newTurn >= s.totalRounds) {
-              const ns = { ...s, phase: 'scores', guessResult: null };
+              const ns = { ...s, phase: 'scores' };
               onStateChange(ns); render(ns); return;
             }
             const newOrder = s.order;
             const nextActiveId = newOrder[newTurn % newOrder.length];
             const newRole = CAMELEON_ROLES[Math.floor(Math.random()*CAMELEON_ROLES.length)];
             const newQ = CAMELEON_QUESTIONS[Math.floor(Math.random()*CAMELEON_QUESTIONS.length)];
-            const ns = { ...s, phase:'show_role', turn:newTurn, activeRolePlayerId:nextActiveId, role:newRole, question:newQ, guessResult:null };
+            const ns = { ...s, phase:'show_role', turn:newTurn, activeRolePlayerId:nextActiveId, role:newRole, question:newQ, options:[], guesses:{}, revealed:false };
             onStateChange(ns); render(ns);
           };
+
         } else {
+          // ── Devine en cours : CHAQUE joueur non-actif devine pour lui-même ──
+          const myGuess = s.guesses[myId];
+          const guessedCount = Object.keys(s.guesses).length;
+          const totalGuessers = nonActivePlayers.length;
+
           root.innerHTML = `
             <div class="game-header"><div class="game-title">🦎 Caméléon</div></div>
             <div class="game-body slide-up">
@@ -164,33 +197,41 @@ GameEngines['cameleon'] = {
                 <div class="challenge-type">🎯 QUESTION</div>
                 <div class="challenge-text">${s.question}</div>
               </div>
-              ${isHost ? `
-                <div class="section-label">QUEL ÉTAIT SON RÔLE ? (host révèle le résultat)</div>
+              ${amActive ? `
+                <div class="guest-waiting"><div class="pulse-dot"></div>Les autres devinent ton rôle… (${guessedCount}/${totalGuessers})</div>
+              ` : myGuess ? `
+                <div class="guest-waiting"><div class="pulse-dot"></div>Ton choix : <strong style="color:var(--text)">${myGuess}</strong><br>En attente des autres… (${guessedCount}/${totalGuessers})</div>
+              ` : `
+                <div class="section-label">SELON TOI, QUEL ÉTAIT SON RÔLE ?</div>
                 <div class="vote-grid">
-                  ${options.map(o => `
-                    <button class="vote-btn" onclick="cameleonGuess('${o.role}')">${o.role}</button>
+                  ${s.options.map(role => `
+                    <button class="vote-btn" onclick="cameleonSubmitGuess('${role.replace(/'/g, "\\'")}')">${role}</button>
                   `).join('')}
                 </div>
-                <button class="btn-secondary" onclick="cameleonNoGuess()">Personne n'a deviné</button>
-              ` : `<div class="guest-waiting"><div class="pulse-dot"></div>Écoutez ${activeName} et devinez !</div>`}
+              `}
+              ${isHost && guessedCount < totalGuessers ? `
+                <button class="btn-secondary" onclick="cameleonForceReveal()">Révéler maintenant (${guessedCount}/${totalGuessers} ont deviné)</button>
+              ` : ''}
             </div>
           `;
-          if (isHost) {
-            window.cameleonGuess = (guess) => {
-              const correct = guess === s.role.role;
-              let ns = { ...s };
-              if (correct) {
-                players.forEach(p => { if (p.id !== activeId) ns.scores[p.id] = (ns.scores[p.id]||0)+1; });
-              } else {
-                ns.scores[activeId] = (ns.scores[activeId]||0)+2;
+
+          // N'importe quel joueur non-actif peut soumettre sa propre
+          // réponse — c'était auparavant réservé au host, qui devinait au
+          // nom de tout le monde.
+          if (!amActive && !myGuess) {
+            window.cameleonSubmitGuess = (role) => {
+              let ns = { ...s, guesses: { ...s.guesses, [myId]: role } };
+              if (Object.keys(ns.guesses).length >= totalGuessers) {
+                ns = _cameleonReveal(ns, players);
+                Logger.info('cameleon', 'Tous les invités ont deviné — révélation automatique');
               }
-              ns.guessResult = correct;
               onStateChange(ns); render(ns);
             };
-            window.cameleonNoGuess = () => {
-              let ns = { ...s };
-              ns.scores[activeId] = (ns.scores[activeId]||0)+2;
-              ns.guessResult = false;
+          }
+          if (isHost) {
+            window.cameleonForceReveal = () => {
+              Logger.info('cameleon', 'Révélation forcée par le host', guessedCount, '/', totalGuessers);
+              const ns = _cameleonReveal(s, players);
               onStateChange(ns); render(ns);
             };
           }
@@ -206,15 +247,16 @@ GameEngines['cameleon'] = {
         });
       }
 
-      // Subscribe non-host to state changes (juste re-render, jamais re-mount)
-      if (!isHost) {
-        _sub = DB.subscribeRoom(Session.room.id, (room) => {
-          if (!room.game_state) return;
-          Logger.debug('cameleon', 'État reçu du host', room.game_state.phase);
-          try { render(room.game_state); }
-          catch (e) { Logger.error('cameleon', 'render() a échoué sur update realtime :', e.message, e.stack); showFatalError(e.message); }
-        });
-      }
+      // Tout le monde s'abonne aux mises à jour temps réel — pas que les
+      // invités. Depuis que n'importe quel joueur non-actif peut écrire son
+      // propre guess (pas seulement le host), le host doit aussi être
+      // notifié pour voir l'avancée des devines des invités en direct.
+      _sub = DB.subscribeRoom(Session.room.id, (room) => {
+        if (!room.game_state) return;
+        Logger.debug('cameleon', 'État reçu', room.game_state.phase);
+        try { render(room.game_state); }
+        catch (e) { Logger.error('cameleon', 'render() a échoué sur update realtime :', e.message, e.stack); showFatalError(e.message); }
+      });
     };
 
     Logger.info('cameleon', 'mount', { isHost, players: players.length });
