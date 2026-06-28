@@ -22,7 +22,7 @@ GameEngines['mission'] = {
     const assignments = Object.fromEntries(
       players.map((p, i) => [p.id, {
         mission: shuffledMissions[i % shuffledMissions.length],
-        validated: false,
+        status: 'pending',   // pending | success | failed — déclaré par le joueur lui-même
       }])
     );
     const scores = Object.fromEntries(players.map(p => [p.id, 0]));
@@ -94,30 +94,48 @@ GameEngines['mission'] = {
         }
 
       } else if (s.phase === 'play') {
-        // Board view — everyone sees all missions (blurred if not validated)
+        // Chaque joueur déclare lui-même le résultat de SA mission (réussi
+        // ou échoué) — avant, seul le host pouvait valider, au nom de tout
+        // le monde, sans possibilité d'indiquer un échec.
+        // Compat avec un ancien state (avant l'ajout de status) qui
+        // utilisait encore `validated: boolean`.
+        const assignments = Object.fromEntries(
+          Object.entries(s.assignments).map(([pid, a]) => [
+            pid,
+            a.status ? a : { ...a, status: a.validated ? 'success' : 'pending' },
+          ])
+        );
+
         root.innerHTML = `
           <div class="game-header"><div class="game-title">🕵️ Tableau des Missions</div></div>
           <div class="game-body slide-up">
             <div style="font-size:13px;color:var(--muted);text-align:center;line-height:1.6">
-              Jouez normalement.<br>Quand quelqu'un accomplit sa mission, appuyez sur son nom !
+              Jouez normalement.<br>Quand ta mission est faite (ou ratée), déclare-la toi-même ci-dessous !
             </div>
             <div style="display:flex;flex-direction:column;gap:10px" id="mission-board">
               ${players.map(p => {
-                const a = s.assignments[p.id];
+                const a = assignments[p.id];
                 const isMe = p.id === me.id;
+                const icon = a.status === 'success' ? '✅' : a.status === 'failed' ? '❌' : '🕵️';
+                const borderColor = a.status === 'success' ? 'var(--accent3)' : a.status === 'failed' ? '#ff3d6b' : 'var(--border)';
+                let detail;
+                if (a.status === 'success') detail = `<div style="font-size:12px;color:var(--accent3);margin-top:4px">✅ Mission accomplie — +3 pts</div>`;
+                else if (a.status === 'failed') detail = `<div style="font-size:12px;color:#ff3d6b;margin-top:4px">❌ Mission échouée</div>`;
+                else detail = `<div style="font-size:12px;color:var(--muted);margin-top:4px">${isMe ? `"${a.mission}"` : '🤫 Mission en cours…'}</div>`;
                 return `
-                  <div class="mission-card" data-icon="${a.validated?'✅':'🕵️'}"
-                    style="border-color:${a.validated?'var(--accent3)':'var(--border)'}">
+                  <div class="mission-card" data-icon="${icon}" style="border-color:${borderColor}">
                     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
                       <div>
                         <div style="font-weight:700;font-size:15px">${p.avatar} ${p.name} ${isMe?'(moi)':''}</div>
-                        ${a.validated
-                          ? `<div style="font-size:12px;color:var(--accent3);margin-top:4px">✅ Mission accomplie — +3 pts</div>`
-                          : `<div style="font-size:12px;color:var(--muted);margin-top:4px">${isMe ? `"${a.mission}"` : '🤫 Mission en cours…'}</div>`}
+                        ${detail}
                       </div>
-                      ${!a.validated && isHost ? `
-                        <button style="background:var(--accent3);border:none;border-radius:10px;color:#000;font-family:'Syne',sans-serif;font-weight:700;font-size:12px;padding:8px 12px;cursor:pointer;flex-shrink:0"
-                          onclick="missionValidate('${p.id}')">Valider !</button>
+                      ${isMe && a.status === 'pending' ? `
+                        <div style="display:flex;gap:6px;flex-shrink:0">
+                          <button style="background:var(--accent3);border:none;border-radius:10px;color:#000;font-family:'Syne',sans-serif;font-weight:700;font-size:12px;padding:8px 10px;cursor:pointer"
+                            onclick="missionMark('success')">✅ Réussi</button>
+                          <button style="background:#ff3d6b;border:none;border-radius:10px;color:#fff;font-family:'Syne',sans-serif;font-weight:700;font-size:12px;padding:8px 10px;cursor:pointer"
+                            onclick="missionMark('failed')">❌ Raté</button>
+                        </div>
                       ` : ''}
                     </div>
                   </div>
@@ -131,15 +149,18 @@ GameEngines['mission'] = {
             ` : `<div class="guest-waiting"><div class="pulse-dot"></div>La partie est en cours…</div>`}
           </div>
         `;
+
+        // Chaque joueur déclare le résultat de SA PROPRE mission.
+        window.missionMark = (status) => {
+          const ns = { ...s, assignments: { ...assignments }, scores: { ...s.scores } };
+          ns.assignments[me.id] = { ...ns.assignments[me.id], status };
+          if (status === 'success') ns.scores[me.id] = (ns.scores[me.id] || 0) + 3;
+          Logger.info('mission', 'Mission déclarée', status, 'par', me.id);
+          onStateChange(ns); render(ns);
+        };
         if (isHost) {
-          window.missionValidate = (pid) => {
-            const ns = { ...s, assignments:{...s.assignments}, scores:{...s.scores} };
-            ns.assignments[pid] = { ...ns.assignments[pid], validated:true };
-            ns.scores[pid] = (ns.scores[pid]||0) + 3;
-            onStateChange(ns); render(ns);
-          };
           window.missionEnd = () => {
-            const ns = { ...s, phase:'scores' };
+            const ns = { ...s, assignments, phase:'scores' };
             onStateChange(ns); render(ns);
           };
         }
