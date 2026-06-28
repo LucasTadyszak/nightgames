@@ -24,6 +24,76 @@ const Session = {
   players: [],
 };
 
+// ── Persisted session (survit à un rafraîchissement de page) ──────────
+// On ne stocke que des identifiants (roomId + playerId), jamais l'état
+// du jeu lui-même : au retour, on relit tout depuis Supabase (source de
+// vérité) pour ne jamais rejouer sur un état périmé.
+const SESSION_STORAGE_KEY = 'nightgames_session';
+
+function _saveSession() {
+  try {
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
+      roomId: Session.room.id,
+      playerId: Session.me.id,
+    }));
+    Logger.debug('lobby', 'Session sauvegardée (localStorage)', Session.room.id, Session.me.id);
+  } catch (e) {
+    Logger.warn('lobby', 'Impossible de sauvegarder la session (localStorage indisponible)', e.message);
+  }
+}
+
+function _clearSavedSession() {
+  try { localStorage.removeItem(SESSION_STORAGE_KEY); } catch (e) {}
+}
+
+function _readSavedSession() {
+  try {
+    const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// ══════════════════════════════════════
+// RESTORE — appelé au boot, avant d'afficher l'écran d'accueil.
+// Si une session valide est trouvée, on rejoint directement la salle
+// (et la partie en cours, le cas échéant) sans repasser par l'accueil.
+// ══════════════════════════════════════
+async function tryRestoreSession() {
+  const saved = _readSavedSession();
+  if (!saved) return false;
+
+  Logger.info('lobby', 'Tentative de restauration de session', saved);
+  try {
+    const room = await DB.getRoomById(saved.roomId);
+    if (!room) { Logger.warn('lobby', 'Salle disparue, session abandonnée'); _clearSavedSession(); return false; }
+
+    const me = await DB.getPlayer(saved.playerId);
+    if (!me) { Logger.warn('lobby', 'Joueur disparu de la salle, session abandonnée'); _clearSavedSession(); return false; }
+
+    Session.room   = room;
+    Session.me     = me;
+    Session.isHost = !!me.is_host;
+
+    showToast(`Reconnecté à la salle ${room.code} 🎉`);
+
+    if (room.status === 'playing' && room.game) {
+      // On relit la liste de joueurs avant de remonter le jeu (les
+      // moteurs en ont besoin pour afficher noms/avatars/scores).
+      Session.players = await DB.getPlayers(room.id);
+      _launchGame(room.game, room.game_state);
+    } else {
+      _enterLobby();
+    }
+    return true;
+  } catch (e) {
+    Logger.error('lobby', 'Échec de la restauration de session :', e.message || e);
+    _clearSavedSession();
+    return false;
+  }
+}
+
 // ══════════════════════════════════════
 // LOBBY — Initialise UI bindings
 // ══════════════════════════════════════
@@ -106,6 +176,7 @@ async function doCreateRoom(playerId, name, avatar) {
   Session.room    = room;
   Session.me      = me;
   Session.isHost  = true;
+  _saveSession();
   _enterLobby();
 }
 
@@ -125,6 +196,7 @@ async function doJoinRoom(code, playerId, name, avatar) {
   Session.room   = room;
   Session.me     = me;
   Session.isHost = false;
+  _saveSession();
   _enterLobby();
 }
 
@@ -266,25 +338,38 @@ function _launchGame(gameId, state) {
   DB.unsub(Session.playersSub);
 
   showScreen('game');
-  GameEngines[gameId].mount(
-    document.getElementById('game-root'),
-    state,
-    Session.players,
-    Session.me,
-    Session.isHost,
-    // onStateChange — host pushes new state
-    async (newState) => {
-      if (Session.isHost) {
+  clearFatalError();
+  try {
+    GameEngines[gameId].mount(
+      document.getElementById('game-root'),
+      state,
+      Session.players,
+      Session.me,
+      Session.isHost,
+      // onStateChange — pousse le nouvel état en base.
+      // NOTE : ce n'est PAS réservé au host. Plusieurs jeux (Vérité ou
+      // Défi, Mission Impossible, Loups Garous) ont des actions privées
+      // déclenchées par le joueur ACTIF, qui peut être un invité. Si on
+      // bloquait l'écriture aux non-hosts ici, l'action de l'invité ne
+      // serait jamais persistée en base : son écran changerait localement
+      // mais le host et les autres ne verraient jamais rien, et le prochain
+      // événement realtime écraserait son changement (partie qui semble
+      // bloquée/figée côté invité).
+      async (newState) => {
         try {
           await DB.updateRoom(Session.room.id, { game_state: newState });
         } catch (e) {
           Logger.error('lobby', 'Échec de la synchronisation de l\'état du jeu :', e.message || e);
+          showToast('Erreur de synchronisation : ' + (e.message || 'inconnue'));
         }
-      }
-    },
-    // onEnd
-    () => { Logger.info('lobby', 'Retour au lobby depuis', gameId); showScreen('lobby'); _enterLobby(); }
-  );
+      },
+      // onEnd
+      () => { Logger.info('lobby', 'Retour au lobby depuis', gameId); showScreen('lobby'); _enterLobby(); }
+    );
+  } catch (e) {
+    Logger.error('lobby', `mount() de "${gameId}" a levé une exception :`, e.message || e, e.stack);
+    showFatalError(e.message || String(e));
+  }
 }
 
 // ══════════════════════════════════════
@@ -302,5 +387,6 @@ async function leaveLobby() {
   if (Session.me) await DB.leaveRoom(Session.me.id);
   if (Session.isHost) await DB.deleteRoom(Session.room.id);
   Session.room = null; Session.me = null;
+  _clearSavedSession();
   showScreen('home');
 }

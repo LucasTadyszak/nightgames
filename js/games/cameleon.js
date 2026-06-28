@@ -201,7 +201,10 @@ GameEngines['cameleon'] = {
       // Subscribe non-host to state changes (juste re-render, jamais re-mount)
       if (!isHost) {
         _sub = DB.subscribeRoom(Session.room.id, (room) => {
-          if (room.game_state) { Logger.debug('cameleon', 'État reçu du host', room.game_state.phase); render(room.game_state); }
+          if (!room.game_state) return;
+          Logger.debug('cameleon', 'État reçu du host', room.game_state.phase);
+          try { render(room.game_state); }
+          catch (e) { Logger.error('cameleon', 'render() a échoué sur update realtime :', e.message, e.stack); showFatalError(e.message); }
         });
       }
     };

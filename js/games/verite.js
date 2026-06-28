@@ -143,7 +143,10 @@ GameEngines['verite'] = {
       // Guests subscribe to state push
       if (!isHost) {
         _sub = DB.subscribeRoom(Session.room.id, (room) => {
-          if (room.game_state) { render(room.game_state); }
+          if (!room.game_state) return;
+          Logger.debug('verite', 'État reçu', room.game_state.phase);
+          try { render(room.game_state); }
+          catch (e) { Logger.error('verite', 'render() a échoué sur update realtime :', e.message, e.stack); showFatalError(e.message); }
         });
       }
     };

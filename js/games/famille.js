@@ -119,7 +119,10 @@ GameEngines['famille'] = {
 
       if (!isHost) {
         _sub = DB.subscribeRoom(Session.room.id, (room) => {
-          if (room.game_state) render(room.game_state);
+          if (!room.game_state) return;
+          Logger.debug('famille', 'État reçu', room.game_state.phase);
+          try { render(room.game_state); }
+          catch (e) { Logger.error('famille', 'render() a échoué sur update realtime :', e.message, e.stack); showFatalError(e.message); }
         });
       }
     };

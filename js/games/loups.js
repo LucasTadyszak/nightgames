@@ -227,7 +227,12 @@ GameEngines['loups'] = {
       }
 
       if (!isHost) {
-        _sub = DB.subscribeRoom(Session.room.id, (room)=>{ if(room.game_state) render(room.game_state); });
+        _sub = DB.subscribeRoom(Session.room.id, (room) => {
+          if (!room.game_state) return;
+          Logger.debug('loups', 'État reçu', room.game_state.phase);
+          try { render(room.game_state); }
+          catch (e) { Logger.error('loups', 'render() a échoué sur update realtime :', e.message, e.stack); showFatalError(e.message); }
+        });
       }
     };
 

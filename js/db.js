@@ -34,6 +34,18 @@ const DB = {
     return data;
   },
 
+  /** Get room by id (used to restore a session after reload). Returns null if gone. */
+  async getRoomById(roomId) {
+    Logger.debug('db', 'getRoomById →', roomId);
+    const { data, error } = await _sb
+      .from('rooms')
+      .select('*')
+      .eq('id', roomId)
+      .maybeSingle();
+    if (error) { Logger.error('db', 'getRoomById échec', roomId, error.message); throw error; }
+    return data;
+  },
+
   /** Get room by code */
   async getRoom(code) {
     Logger.debug('db', 'getRoom →', code);
@@ -72,6 +84,18 @@ const DB = {
     if (error) { Logger.error('db', 'joinRoom échec', error.message); throw error; }
     Logger.info('db', 'Joueur rejoint', player.name, '→', roomId);
     return data;
+  },
+
+  /** Get a single player by id (used to restore a session after reload) */
+  async getPlayer(playerId) {
+    Logger.debug('db', 'getPlayer →', playerId);
+    const { data, error } = await _sb
+      .from('players')
+      .select('*')
+      .eq('id', playerId)
+      .maybeSingle();
+    if (error) { Logger.error('db', 'getPlayer échec', playerId, error.message); throw error; }
+    return data; // null si le joueur n'existe plus (salle supprimée, kické, etc.)
   },
 
   /** Get all players in room */

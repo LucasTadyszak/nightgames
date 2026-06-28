@@ -147,7 +147,12 @@ GameEngines['changer'] = {
       }
 
       if (!isHost) {
-        _sub = DB.subscribeRoom(Session.room.id, (room)=>{ if(room.game_state) render(room.game_state); });
+        _sub = DB.subscribeRoom(Session.room.id, (room) => {
+          if (!room.game_state) return;
+          Logger.debug('changer', 'État reçu', room.game_state.phase);
+          try { render(room.game_state); }
+          catch (e) { Logger.error('changer', 'render() a échoué sur update realtime :', e.message, e.stack); showFatalError(e.message); }
+        });
       }
     };
 
