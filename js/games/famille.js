@@ -15,9 +15,12 @@ const FAMILLE_QUESTIONS = [
     answers:[{t:'Manger en cachette',pts:35},{t:'Stalker les réseaux',pts:28},{t:'Chanter sous la douche',pts:20},{t:'Parler tout seul',pts:12},{t:'Lire les horoscopes',pts:5}] },
 ];
 
+const FAMILLE_TIMER_SECONDS = 30;
+
 GameEngines['famille'] = {
 
   initState(players) {
+    const order = shuffle(players.map(p => p.id));
     const qIdx = Math.floor(Math.random() * FAMILLE_QUESTIONS.length);
     const scores = Object.fromEntries(players.map(p => [p.id, 0]));
     return {
@@ -32,6 +35,13 @@ GameEngines['famille'] = {
       // si le host fait partie de l'équipe qui doit deviner, il doit
       // pouvoir passer le rôle de meneur à quelqu'un d'autre.
       leaderId: (players.find(p => p.is_host) || players[0]).id,
+      // Chaque question est destinée à UN SEUL joueur (qui répond et
+      // récupère les points) ; les autres observent. On tourne entre les
+      // joueurs au fil des questions plutôt que de partager les points.
+      order,
+      answererId: order[0],
+      roundStartedAt: Date.now(),  // pour calculer le compte à rebours côté client
+      timerDuration: FAMILLE_TIMER_SECONDS,
     };
   },
 
@@ -41,15 +51,36 @@ GameEngines['famille'] = {
   mount(root, state, players, me, isHost, onStateChange, onEnd) {
     Logger.info('famille', 'mount', { isHost, players: players.length });
 
+    // Timer purement local à l'affichage : on ne pousse pas une écriture
+    // en base chaque seconde (ça spammerait Realtime pour rien), on se
+    // contente de calculer le temps restant à partir de `roundStartedAt`,
+    // identique sur tous les appareils. Un seul intervalle vivant à la
+    // fois : on le coupe au début de chaque render() pour ne pas en
+    // empiler un par mise à jour reçue.
+    let timerHandle = null;
+    const stopTimer = () => { if (timerHandle) { clearInterval(timerHandle); timerHandle = null; } };
+
     const render = (s) => {
+      stopTimer();
       root.innerHTML = '';
       const g = { g1:'#ff9500', g2:'#ff3d6b' };
 
       if (s.phase === 'play') {
-        // state hérité d'une partie démarrée avant l'ajout du meneur.
-        const leaderId = s.leaderId || (players.find(p => p.is_host) || players[0]).id;
-        const isLeader = me.id === leaderId;
-        const leader = players.find(p => p.id === leaderId);
+        // Tolère un state persisté par une version antérieure du jeu
+        // (avant l'ajout du meneur / du répondant unique / du timer).
+        s = {
+          leaderId: (players.find(p => p.is_host) || players[0]).id,
+          order: players.map(p => p.id),
+          answererId: players[0].id,
+          roundStartedAt: Date.now(),
+          timerDuration: FAMILLE_TIMER_SECONDS,
+          ...s,
+        };
+
+        const isLeader = me.id === s.leaderId;
+        const leader = players.find(p => p.id === s.leaderId);
+        const answerer = players.find(p => p.id === s.answererId) || players[0];
+        const amAnswerer = me.id === answerer.id;
         const q = FAMILLE_QUESTIONS[s.questionIdx];
 
         root.innerHTML = `
@@ -60,6 +91,16 @@ GameEngines['famille'] = {
               <button class="btn-secondary" id="famille-btn-pick-leader" style="width:auto;padding:8px 12px;font-size:12px">Changer</button>
             </div>
             <div id="famille-leader-picker"></div>
+
+            <div class="turn-banner" style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+              <div>
+                <div class="turn-banner-label">CETTE QUESTION EST POUR</div>
+                <div class="turn-banner-name">${answerer.avatar} ${answerer.name}${amAnswerer ? ' (toi)' : ''}</div>
+              </div>
+              <div id="famille-timer" style="font-family:'Space Mono',monospace;font-size:22px;font-weight:700;color:var(--accent4)">--:--</div>
+            </div>
+            ${!amAnswerer && !isLeader ? `<div style="font-size:12px;color:var(--muted);text-align:center">Vous observez cette manche — les points iront à ${answerer.name} si la réponse est validée.</div>` : ''}
+
             <div style="font-family:'Bebas Neue',sans-serif;font-size:clamp(18px,5vw,26px);text-align:center;line-height:1.3;padding:20px;background:var(--surface);border-radius:var(--r-lg);border:1px solid var(--border)">
               ${q.q}
             </div>
@@ -86,7 +127,7 @@ GameEngines['famille'] = {
                 <button class="btn-primary" style="--g1:${g.g1};--g2:${g.g2}" onclick="familleRevealAll()">Tout révéler</button>
                 <button class="btn-secondary" onclick="familleNext()">Question suivante →</button>
               </div>
-              <div style="font-size:12px;color:var(--muted);text-align:center">Quelqu'un propose une réponse à voix haute → si elle correspond, appuie sur la ligne pour l'accepter et la révéler. Sinon, ne fais rien (refusée).</div>
+              <div style="font-size:12px;color:var(--muted);text-align:center">${answerer.name} propose une réponse à voix haute → si elle correspond, appuie sur la ligne pour l'accepter (les points lui sont attribués). Sinon, ne fais rien.</div>
             ` : `<div class="guest-waiting"><div class="pulse-dot"></div>${leader?.name} mène cette manche et valide les réponses…</div>`}
             <div class="score-list">
               ${players.map(p=>`
@@ -99,6 +140,22 @@ GameEngines['famille'] = {
             </div>
           </div>
         `;
+
+        // ── Timer (affichage local uniquement) ──
+        const timerEl = document.getElementById('famille-timer');
+        const tick = () => {
+          const elapsed = Math.floor((Date.now() - s.roundStartedAt) / 1000);
+          const remaining = Math.max(0, s.timerDuration - elapsed);
+          const mm = String(Math.floor(remaining / 60)).padStart(2, '0');
+          const ss = String(remaining % 60).padStart(2, '0');
+          if (timerEl) {
+            timerEl.textContent = `${mm}:${ss}`;
+            timerEl.style.color = remaining === 0 ? '#ff3d6b' : (remaining <= 10 ? '#ff9500' : 'var(--accent4)');
+          }
+          if (remaining === 0) stopTimer();
+        };
+        tick();
+        timerHandle = setInterval(tick, 1000);
 
         // N'importe quel joueur peut proposer de changer de meneur (utile
         // si le meneur actuel doit lui-même deviner, ou n'est pas dispo) —
@@ -125,8 +182,9 @@ GameEngines['famille'] = {
             const q = FAMILLE_QUESTIONS[s.questionIdx];
             const pts = q.answers[idx].pts;
             const ns = { ...s, revealed:[...s.revealed, idx], scores:{...s.scores} };
-            // Add points to everyone (team mode simplified: all share)
-            players.forEach(p => { ns.scores[p.id] = (ns.scores[p.id]||0) + Math.round(pts/players.length); });
+            // Les points vont en entier au joueur à qui la question est
+            // destinée — avant, ils étaient partagés entre tout le monde.
+            ns.scores[s.answererId] = (ns.scores[s.answererId]||0) + pts;
             onStateChange(ns); render(ns);
           };
           window.familleRevealAll = () => {
@@ -134,7 +192,7 @@ GameEngines['famille'] = {
             let ns = { ...s, scores:{...s.scores} };
             q.answers.forEach((a, i) => {
               if (!s.revealed.includes(i)) {
-                players.forEach(p => { ns.scores[p.id] = (ns.scores[p.id]||0) + Math.round(a.pts/players.length); });
+                ns.scores[s.answererId] = (ns.scores[s.answererId]||0) + a.pts;
               }
             });
             ns.revealed = q.answers.map((_,i)=>i);
@@ -148,7 +206,16 @@ GameEngines['famille'] = {
             let nextIdx;
             do { nextIdx = Math.floor(Math.random()*FAMILLE_QUESTIONS.length); }
             while (nextIdx === s.questionIdx);
-            const ns = { ...s, questionIdx:nextIdx, revealed:[], questionCount:s.questionCount+1 };
+            const nextQuestionCount = s.questionCount + 1;
+            const nextAnswererId = s.order[nextQuestionCount % s.order.length];
+            const ns = {
+              ...s,
+              questionIdx: nextIdx,
+              revealed: [],
+              questionCount: nextQuestionCount,
+              answererId: nextAnswererId,
+              roundStartedAt: Date.now(),
+            };
             onStateChange(ns); render(ns);
           };
         }
