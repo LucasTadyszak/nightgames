@@ -63,15 +63,23 @@ GameEngines['famille'] = {
             <div style="font-family:'Bebas Neue',sans-serif;font-size:clamp(18px,5vw,26px);text-align:center;line-height:1.3;padding:20px;background:var(--surface);border-radius:var(--r-lg);border:1px solid var(--border)">
               ${q.q}
             </div>
+            ${isLeader ? `<div style="font-size:11px;color:var(--accent3);text-align:center;letter-spacing:1px">📵 TOI SEUL VOIS LES RÉPONSES NON RÉVÉLÉES</div>` : ''}
             <div style="display:flex;flex-direction:column;gap:8px">
-              ${q.answers.map((a, i) => `
-                <div class="answer-row ${s.revealed.includes(i)?'revealed':''}"
-                  ${isLeader && !s.revealed.includes(i) ? `onclick="familleReveal(${i})"` : ''}>
+              ${q.answers.map((a, i) => {
+                const revealed = s.revealed.includes(i);
+                // Le meneur doit voir le texte caché pour pouvoir juger si
+                // ce qui a été dit à voix haute correspond — avant, même
+                // lui voyait "???" et ne pouvait pas savoir quoi révéler.
+                const showText = revealed || isLeader;
+                return `
+                <div class="answer-row ${revealed?'revealed':''} ${isLeader && !revealed ? 'leader-peek' : ''}"
+                  ${isLeader && !revealed ? `onclick="familleReveal(${i})"` : ''}>
                   <div class="answer-num">${i+1}</div>
-                  <div class="answer-text">${s.revealed.includes(i) ? a.t : '???'}</div>
-                  <div class="answer-pts">${s.revealed.includes(i) ? `+${a.pts}` : '🔒'}</div>
+                  <div class="answer-text">${showText ? a.t : '???'}</div>
+                  <div class="answer-pts">${revealed ? `+${a.pts}` : (isLeader ? a.pts : '🔒')}</div>
                 </div>
-              `).join('')}
+              `;
+              }).join('')}
             </div>
             ${isLeader ? `
               <div class="btn-row">

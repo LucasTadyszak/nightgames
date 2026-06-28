@@ -419,6 +419,10 @@ body::before {
   cursor:pointer; transition:all .3s;
 }
 .answer-row.revealed { border-color:var(--accent3); background:rgba(0,212,170,.08); }
+/* Visible uniquement par le meneur : réponse pas encore révélée pour les
+   autres, mais lui doit déjà voir le texte pour juger ce qui a été dit. */
+.answer-row.leader-peek { border-style:dashed; border-color:var(--accent4); }
+.answer-row.leader-peek .answer-text { color:var(--muted); }
 .answer-num { font-family:'Bebas Neue',sans-serif; font-size:22px; color:var(--accent4); min-width:28px; }
 .answer-text { flex:1; font-weight:700; font-size:15px; }
 .answer-pts { font-family:'Space Mono',monospace; font-size:14px; color:var(--accent3); }
