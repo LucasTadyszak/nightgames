@@ -22,6 +22,12 @@ const CAMELEON_QUESTIONS = [
   'Décris ta journée comme si c\'était un film.',
 ];
 
+// Liste les joueurs de `pool` dont l'id n'apparaît pas dans `doneMap`,
+// pour afficher "en attente de Léo, Sam" plutôt qu'un simple compteur.
+function _cameleonPending(pool, doneMap) {
+  return pool.filter(p => !doneMap[p.id]).map(p => `${p.avatar} ${p.name}`).join(', ');
+}
+
 function _cameleonOptionsFor(role) {
   const wrongOptions = shuffle(CAMELEON_ROLES.filter(r => r.role !== role.role)).slice(0, 3);
   return shuffle([role, ...wrongOptions]).map(o => o.role);
@@ -65,6 +71,7 @@ GameEngines['cameleon'] = {
       options: [],         // choix multiples affichés pendant 'guessing' (générés une fois par tour)
       guesses: {},         // playerId -> rôle deviné (un par joueur non-actif)
       revealed: false,
+      ready: {},           // playerId -> true : a confirmé être prêt à deviner (un par joueur non-actif)
       totalRounds: players.length * 2,
     };
   },
@@ -81,7 +88,7 @@ GameEngines['cameleon'] = {
       // Tolère un state persisté par une version antérieure du jeu
       // (avant l'ajout de guesses/options/revealed) pour ne pas planter
       // sur une partie déjà en cours au moment de la mise à jour.
-      s = { options: [], guesses: {}, revealed: false, ...s };
+      s = { options: [], guesses: {}, revealed: false, ready: {}, ...s };
       root.innerHTML = '';
       const myId = me.id;
       const activeId = s.activeRolePlayerId;
@@ -91,9 +98,14 @@ GameEngines['cameleon'] = {
       const nonActivePlayers = players.filter(p => p.id !== activeId);
 
       if (s.phase === 'show_role') {
-        // Le bouton pour avancer ("tout le monde a lu") doit être visible
-        // par le HOST quel qu'il soit — y compris quand le rôle secret
-        // tombe sur un invité (amActive=false pour le host).
+        // Chaque joueur non-actif donne SON propre accord ("j'ai vu / je suis
+        // prêt") au lieu que le host décide seul pour tout le monde. On passe
+        // à la phase de devine automatiquement quand tous ont confirmé.
+        const readyCount = Object.keys(s.ready).length;
+        const totalReady = nonActivePlayers.length;
+        const iAmReady = !!s.ready[myId];
+        const pendingReadyNames = _cameleonPending(nonActivePlayers, s.ready);
+
         if (amActive) {
           root.innerHTML = `
             <div class="game-header">
@@ -114,8 +126,8 @@ GameEngines['cameleon'] = {
                 Réponds <strong style="color:var(--text)">en restant dans ton personnage</strong>.<br>
                 Les autres vont essayer de deviner ton rôle !
               </div>
-              ${isHost ? `<button class="btn-primary" style="--g1:#7c3aed;--g2:#00aaff"
-                onclick="cameleonHostReveal()">TOUT LE MONDE A LU → DEVINER</button>` : `<div class="guest-waiting"><div class="pulse-dot"></div>Attends que le host lance la phase de devine…</div>`}
+              <div class="guest-waiting"><div class="pulse-dot"></div>En attente que tout le monde soit prêt… (${readyCount}/${totalReady})${pendingReadyNames ? `<br><span style="font-size:12px">⏳ ${pendingReadyNames}</span>` : ''}</div>
+              ${isHost && readyCount < totalReady ? `<button class="btn-secondary" onclick="cameleonForceStartGuessing()">Lancer maintenant — manque ${pendingReadyNames}</button>` : ''}
             </div>
           `;
         } else {
@@ -126,14 +138,34 @@ GameEngines['cameleon'] = {
               <div class="waiting-title">${activeAvatar} ${activeName}</div>
               <div class="waiting-sub">lit son rôle secret…<br>Fermez les yeux !</div>
             </div>
-            ${isHost ? `<div style="padding:0 24px"><button class="btn-primary" style="--g1:#7c3aed;--g2:#00aaff"
-              onclick="cameleonHostReveal()">TOUT LE MONDE A LU → DEVINER</button></div>` : ''}
+            <div style="padding:0 24px;display:flex;flex-direction:column;gap:10px">
+              ${iAmReady
+                ? `<div class="guest-waiting"><div class="pulse-dot"></div>C'est noté ! En attente des autres… (${readyCount}/${totalReady})${pendingReadyNames ? `<br><span style="font-size:12px">⏳ ${pendingReadyNames}</span>` : ''}</div>`
+                : `<button class="btn-primary" style="--g1:#7c3aed;--g2:#00aaff" onclick="cameleonConfirmReady()">✅ J'ai vu, prêt à deviner !</button>`}
+              ${isHost && readyCount < totalReady ? `<button class="btn-secondary" onclick="cameleonForceStartGuessing()">Lancer maintenant — manque ${pendingReadyNames}</button>` : ''}
+            </div>
           `;
         }
-        if (isHost) window.cameleonHostReveal = () => {
-          const ns = { ...s, phase: 'guessing', options: _cameleonOptionsFor(s.role), guesses: {}, revealed: false };
-          onStateChange(ns); render(ns);
-        };
+
+        // N'importe quel joueur non-actif confirme pour lui-même.
+        if (!amActive && !iAmReady) {
+          window.cameleonConfirmReady = () => {
+            let ns = { ...s, ready: { ...s.ready, [myId]: true } };
+            if (Object.keys(ns.ready).length >= totalReady) {
+              Logger.info('cameleon', 'Tout le monde est prêt — passage à la devine');
+              ns = { ...ns, phase: 'guessing', options: _cameleonOptionsFor(ns.role), guesses: {}, revealed: false };
+            }
+            onStateChange(ns); render(ns);
+          };
+        }
+        // Garde-fou côté host si quelqu'un ne répond pas.
+        if (isHost && readyCount < totalReady) {
+          window.cameleonForceStartGuessing = () => {
+            Logger.info('cameleon', 'Passage forcé à la devine par le host', readyCount, '/', totalReady);
+            const ns = { ...s, phase: 'guessing', options: _cameleonOptionsFor(s.role), guesses: {}, revealed: false };
+            onStateChange(ns); render(ns);
+          };
+        }
 
       } else if (s.phase === 'guessing') {
         if (s.revealed) {
@@ -180,7 +212,7 @@ GameEngines['cameleon'] = {
             const nextActiveId = newOrder[newTurn % newOrder.length];
             const newRole = CAMELEON_ROLES[Math.floor(Math.random()*CAMELEON_ROLES.length)];
             const newQ = CAMELEON_QUESTIONS[Math.floor(Math.random()*CAMELEON_QUESTIONS.length)];
-            const ns = { ...s, phase:'show_role', turn:newTurn, activeRolePlayerId:nextActiveId, role:newRole, question:newQ, options:[], guesses:{}, revealed:false };
+            const ns = { ...s, phase:'show_role', turn:newTurn, activeRolePlayerId:nextActiveId, role:newRole, question:newQ, options:[], guesses:{}, revealed:false, ready:{} };
             onStateChange(ns); render(ns);
           };
 
@@ -189,6 +221,7 @@ GameEngines['cameleon'] = {
           const myGuess = s.guesses[myId];
           const guessedCount = Object.keys(s.guesses).length;
           const totalGuessers = nonActivePlayers.length;
+          const pendingGuessNames = _cameleonPending(nonActivePlayers, s.guesses);
 
           root.innerHTML = `
             <div class="game-header"><div class="game-title">🦎 Caméléon</div></div>
@@ -202,9 +235,9 @@ GameEngines['cameleon'] = {
                 <div class="challenge-text">${s.question}</div>
               </div>
               ${amActive ? `
-                <div class="guest-waiting"><div class="pulse-dot"></div>Les autres devinent ton rôle… (${guessedCount}/${totalGuessers})</div>
+                <div class="guest-waiting"><div class="pulse-dot"></div>Les autres devinent ton rôle… (${guessedCount}/${totalGuessers})${pendingGuessNames ? `<br><span style="font-size:12px">⏳ ${pendingGuessNames}</span>` : ''}</div>
               ` : myGuess ? `
-                <div class="guest-waiting"><div class="pulse-dot"></div>Ton choix : <strong style="color:var(--text)">${myGuess}</strong><br>En attente des autres… (${guessedCount}/${totalGuessers})</div>
+                <div class="guest-waiting"><div class="pulse-dot"></div>Ton choix : <strong style="color:var(--text)">${myGuess}</strong><br>En attente des autres… (${guessedCount}/${totalGuessers})${pendingGuessNames ? `<br><span style="font-size:12px">⏳ ${pendingGuessNames}</span>` : ''}</div>
               ` : `
                 <div class="section-label">SELON TOI, QUEL ÉTAIT SON RÔLE ?</div>
                 <div class="vote-grid">
@@ -214,7 +247,7 @@ GameEngines['cameleon'] = {
                 </div>
               `}
               ${isHost && guessedCount < totalGuessers ? `
-                <button class="btn-secondary" onclick="cameleonForceReveal()">Révéler maintenant (${guessedCount}/${totalGuessers} ont deviné)</button>
+                <button class="btn-secondary" onclick="cameleonForceReveal()">Révéler maintenant — manque ${pendingGuessNames}</button>
               ` : ''}
             </div>
           `;
