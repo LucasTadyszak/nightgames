@@ -110,6 +110,13 @@ function initLobby() {
   document.getElementById('btn-leave-lobby').onclick  = () => leaveLobby();
   document.getElementById('btn-copy-code').onclick    = () => copyCode();
   document.getElementById('btn-start-game').onclick   = () => hostStartGame();
+
+  // Bouton "✕" toujours visible pendant le jeu (cf. index.html), peu
+  // importe quel moteur de jeu est monté dans #game-root.
+  document.getElementById('btn-quit-game').onclick = () => {
+    const ok = confirm('Terminer la partie en cours et revenir au lobby ?');
+    if (ok) quitGame(Session.room?.game);
+  };
 }
 
 let _pendingFlow = null; // 'create' | 'join'
@@ -332,6 +339,28 @@ async function hostStartGame() {
   }
 }
 
+// ══════════════════════════════════════
+// QUITTER LA PARTIE EN COURS → retour au lobby.
+// Appelé par le bouton "Retour au lobby" en fin de partie (scoreboard)
+// ET par le bouton "✕" toujours visible pendant le jeu, pour qu'on
+// puisse interrompre une partie à tout moment, pas seulement à la fin.
+// ══════════════════════════════════════
+function quitGame(gameId) {
+  Logger.info('lobby', 'Retour au lobby depuis', gameId || Session.room?.game);
+  // Seul le host réinitialise la salle en base (status/game/game_state).
+  // Sans ça, room.status reste 'playing' avec l'ancienne partie : tout
+  // event realtime ultérieur — ou un simple rafraîchissement de page via
+  // tryRestoreSession() — relance l'ancienne partie déjà terminée au lieu
+  // d'afficher le lobby (et peut faire planter le moteur de jeu qui reçoit
+  // un état périmé / une forme de state plus ancienne).
+  if (Session.isHost) {
+    DB.updateRoom(Session.room.id, { status: 'waiting', game: null, game_state: null })
+      .catch(e => Logger.error('lobby', 'Échec de la réinitialisation de la salle :', e.message || e));
+  }
+  showScreen('lobby');
+  _enterLobby();
+}
+
 function _launchGame(gameId, state) {
   Logger.debug('lobby', '_launchGame', gameId);
   DB.unsub(Session.roomSub);
@@ -364,21 +393,7 @@ function _launchGame(gameId, state) {
         }
       },
       // onEnd
-      () => {
-        Logger.info('lobby', 'Retour au lobby depuis', gameId);
-        // Seul le host réinitialise la salle en base (status/game/game_state).
-        // Sans ça, room.status reste 'playing' avec l'ancienne partie : tout
-        // event realtime ultérieur — ou un simple rafraîchissement de page via
-        // tryRestoreSession() — relance l'ancienne partie déjà terminée au
-        // lieu d'afficher le lobby (et peut faire planter le moteur de jeu
-        // qui reçoit un état périmé / une forme de state plus ancienne).
-        if (Session.isHost) {
-          DB.updateRoom(Session.room.id, { status: 'waiting', game: null, game_state: null })
-            .catch(e => Logger.error('lobby', 'Échec de la réinitialisation de la salle :', e.message || e));
-        }
-        showScreen('lobby');
-        _enterLobby();
-      }
+      () => quitGame(gameId)
     );
   } catch (e) {
     Logger.error('lobby', `mount() de "${gameId}" a levé une exception :`, e.message || e, e.stack);
