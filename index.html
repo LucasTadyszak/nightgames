@@ -11,6 +11,16 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>NightGames 🎉</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0d0d1a">
+  <!-- iOS -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="NightGames">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+
   <link rel="stylesheet" href="css/style.css?v=20260628j">
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Syne:wght@400;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 </head>
@@ -163,5 +173,10 @@
   <script src="js/games/famille.js?v=20260628j"></script>
   <script src="js/games/loups.js?v=20260628j"></script>
   <script src="js/games/changer.js?v=20260628j"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js');
+    }
+  </script>
 </body>
 </html>
