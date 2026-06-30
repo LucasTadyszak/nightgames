@@ -49,13 +49,14 @@
       <div class="divider-text">ou</div>
 
       <div class="join-block">
-        <div class="join-qr-hint">
-          <span class="join-qr-icon">📷</span>
+        <button class="btn-hero btn-hero--scan" id="btn-scan-qr">
+          <span class="btn-hero-icon">📷</span>
           <div>
-            <div class="join-qr-title">FLASHE LE QR CODE</div>
-            <div class="join-qr-sub">Scanne le QR affiché chez le host</div>
+            <div class="btn-hero-title">SCANNER LE QR CODE</div>
+            <div class="btn-hero-sub">Pointe ta caméra sur le QR du host</div>
           </div>
-        </div>
+          <span class="btn-hero-arrow">›</span>
+        </button>
 
         <button class="btn-code-toggle" id="btn-toggle-code-input">
           Rejoindre avec un code ›
@@ -157,6 +158,29 @@
   </div>
 
   <!-- ══════════════════════════════════════
+       QR SCANNER MODAL
+  ══════════════════════════════════════ -->
+  <div id="qr-scanner-modal" class="qr-scanner-backdrop hidden">
+    <div class="qr-scanner-card">
+      <div class="qr-scanner-header">
+        <div class="qr-scanner-title">SCANNER LE QR CODE</div>
+        <button class="qr-scanner-close" id="btn-close-scanner">✕</button>
+      </div>
+      <div class="qr-scanner-viewport">
+        <video id="qr-video" playsinline muted autoplay></video>
+        <div class="qr-scanner-frame">
+          <div class="qr-frame-corner tl"></div>
+          <div class="qr-frame-corner tr"></div>
+          <div class="qr-frame-corner bl"></div>
+          <div class="qr-frame-corner br"></div>
+          <div class="qr-scan-line"></div>
+        </div>
+      </div>
+      <div class="qr-scanner-hint" id="qr-scanner-hint">Pointe sur le QR code du host</div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
        TOAST
   ══════════════════════════════════════ -->
   <div class="toast" id="toast"></div>
@@ -196,6 +220,7 @@
   <script src="js/games/famille.js?v=20260628j"></script>
   <script src="js/games/loups.js?v=20260628j"></script>
   <script src="js/games/changer.js?v=20260628j"></script>
+  <script src="js/qr-scanner.js?v=20260628j"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js');

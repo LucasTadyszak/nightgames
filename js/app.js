@@ -170,6 +170,7 @@ async function loadGameContent() {
 document.addEventListener('DOMContentLoaded', async () => {
   Logger.info('app', 'Boot — initialisation du lobby');
   initLobby();
+  QRScanner.init();
   Logger.debug('app', 'GameEngines enregistrés au boot', Object.keys(GameEngines));
 
   // showScreen('home') reste l'état par défaut tant que le contenu des

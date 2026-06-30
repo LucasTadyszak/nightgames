@@ -592,6 +592,89 @@ body::before {
   .confirm-modal-actions { flex-direction: row-reverse; }
 }
 
+/* ══════════════════════════════════════
+   QR SCANNER MODAL
+══════════════════════════════════════ */
+.qr-scanner-backdrop {
+  position: fixed; inset: 0; z-index: 300;
+  background: rgba(0,0,0,.85);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+  backdrop-filter: blur(4px);
+}
+.qr-scanner-backdrop.hidden { display: none; }
+
+.qr-scanner-card {
+  width: 100%; max-width: 360px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+
+.qr-scanner-header {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.qr-scanner-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px; letter-spacing: 3px; color: var(--text);
+}
+.qr-scanner-close {
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text); border-radius: 50%;
+  width: 36px; height: 36px; font-size: 14px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+
+.qr-scanner-viewport {
+  position: relative; width: 100%; aspect-ratio: 1;
+  border-radius: var(--r-lg); overflow: hidden;
+  background: #000;
+}
+#qr-video {
+  width: 100%; height: 100%;
+  object-fit: cover; display: block;
+}
+
+.qr-scanner-frame {
+  position: absolute; inset: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  padding: 24px;
+}
+.qr-frame-corner {
+  width: 28px; height: 28px;
+  border-color: var(--accent1);
+  border-style: solid;
+  border-width: 0;
+}
+.qr-frame-corner.tl { border-top-width: 3px; border-left-width: 3px;  border-radius: 4px 0 0 0; align-self: start; justify-self: start; }
+.qr-frame-corner.tr { border-top-width: 3px; border-right-width: 3px; border-radius: 0 4px 0 0; align-self: start; justify-self: end; }
+.qr-frame-corner.bl { border-bottom-width: 3px; border-left-width: 3px;  border-radius: 0 0 0 4px; align-self: end; justify-self: start; }
+.qr-frame-corner.br { border-bottom-width: 3px; border-right-width: 3px; border-radius: 0 0 4px 0; align-self: end; justify-self: end; }
+
+.qr-scan-line {
+  position: absolute; left: 24px; right: 24px; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent1), transparent);
+  box-shadow: 0 0 8px var(--accent1);
+  animation: scan-move 2s ease-in-out infinite;
+  top: 24px;
+}
+@keyframes scan-move {
+  0%   { top: 24px; }
+  50%  { top: calc(100% - 24px); }
+  100% { top: 24px; }
+}
+
+.qr-scanner-hint {
+  text-align: center; font-size: 13px;
+  color: var(--muted); letter-spacing: 0.5px;
+}
+
+.btn-hero--scan {
+  --g1: var(--accent3); --g2: var(--accent5);
+  background: linear-gradient(135deg, #003d30, #001a3d);
+  border: 1px solid rgba(0, 212, 170, .3);
+}
+
 .btn-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 
 /* Section label */
