@@ -114,9 +114,16 @@ function initLobby() {
       isOpen ? 'Masquer la saisie ×' : 'Rejoindre avec un code ›';
     if (isOpen) setTimeout(() => document.getElementById('join-code-input').focus(), 320);
   };
+  document.getElementById('btn-toggle-qr-link').onclick = () => {
+    const collapse = document.getElementById('qr-link-collapse');
+    const isOpen = collapse.classList.toggle('open');
+    document.getElementById('btn-toggle-qr-link').textContent =
+      isOpen ? 'Masquer le lien ×' : 'Afficher le lien ›';
+  };
   document.getElementById('btn-confirm-name').onclick = () => confirmName();
   document.getElementById('btn-leave-lobby').onclick  = () => leaveLobby();
   document.getElementById('btn-copy-code').onclick    = () => copyCode();
+  document.getElementById('btn-copy-link').onclick    = () => copyLink();
   document.getElementById('btn-start-game').onclick   = () => hostStartGame();
 
   // Bouton "✕" toujours visible pendant le jeu (cf. index.html), peu
@@ -233,6 +240,8 @@ function _enterLobby() {
   // QR code pointant vers l'URL avec le code pré-rempli
   if (Session.isHost) {
     const url = `${location.origin}${location.pathname}?code=${Session.room.code}`;
+    Session.joinUrl = url;
+    document.getElementById('qr-link-input').value = url;
     const container = document.getElementById('qr-canvas');
     container.innerHTML = '';
     const img = document.createElement('img');
@@ -482,6 +491,13 @@ function copyCode() {
   navigator.clipboard.writeText(Session.room.code)
     .then(() => showToast('Code copié ! 📋'))
     .catch(() => showToast(Session.room.code));
+}
+
+function copyLink() {
+  const url = Session.joinUrl || '';
+  navigator.clipboard.writeText(url)
+    .then(() => showToast('Lien copié ! 🔗'))
+    .catch(() => showToast(url));
 }
 
 async function leaveLobby() {

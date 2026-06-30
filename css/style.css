@@ -337,6 +337,30 @@ body::before {
   letter-spacing: 0.5px; text-align:center;
 }
 
+/* Lien de secours dépliable sous le QR */
+.qr-link-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows .3s ease;
+  overflow: hidden;
+}
+.qr-link-collapse.open { grid-template-rows: 1fr; }
+.qr-link-collapse > .qr-link-row { min-height: 0; }
+.qr-link-row { display:flex; flex-direction:column; gap:10px; }
+.qr-link-input {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--text);
+  font-family: 'Space Mono', monospace;
+  font-size: 12px;
+  padding: 10px 12px;
+  width: 100%;
+  text-align: center;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.qr-link-input:focus { outline:none; border-color: var(--accent3); }
+
 .games-picker {
   display: flex; flex-direction:column; gap:10px;
 }
