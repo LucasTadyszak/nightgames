@@ -10,6 +10,7 @@ const GAMES_META = [
   { id:'mission',  name:'Mission Impossible', icon:'🕵️', min:3, color:'#00d4aa', g1:'#00d4aa', g2:'#00aaff' },
   { id:'famille',  name:'Une Famille en Or',  icon:'🏆', min:4, color:'#ff9500', g1:'#ff9500', g2:'#ff3d6b' },
   { id:'loups',    name:'Loups Garous',       icon:'🐺', min:6, color:'#00aaff', g1:'#1e3a8a', g2:'#00aaff' },
+  { id:'undercover',name:'Undercover Ultime', icon:'🕵️', min:3, color:'#ff3d6b', g1:'#ff3d6b', g2:'#7c3aed' },
   { id:'changer',  name:'Game Changer',       icon:'🎲', min:2, color:'#ff6b35', g1:'#ff6b35', g2:'#7c3aed' },
 ];
 
