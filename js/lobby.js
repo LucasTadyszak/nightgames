@@ -229,18 +229,36 @@ function _enterLobby() {
     const container = document.getElementById('qr-canvas');
     container.innerHTML = '';
     const renderQR = () => {
-      QRCode.toCanvas(document.createElement('canvas'), url, {
-        width: 180,
-        margin: 2,
-        color: { dark: '#f0f0ff', light: '#12121a' },
-      }, (err, canvas) => {
-        if (!err) container.appendChild(canvas);
-      });
+      const qr = qrcode(0, 'M');
+      qr.addData(url);
+      qr.make();
+      // Rendu manuel sur canvas avec les couleurs du site
+      const cellSize = 5;
+      const margin   = 2;
+      const count    = qr.getModuleCount();
+      const canvasSize = count * cellSize + margin * 2 * cellSize;
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = canvasSize;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#12121a';
+      ctx.fillRect(0, 0, canvasSize, canvasSize);
+      ctx.fillStyle = '#f0f0ff';
+      for (let r = 0; r < count; r++) {
+        for (let c = 0; c < count; c++) {
+          if (qr.isDark(r, c)) {
+            ctx.fillRect(
+              (c + margin) * cellSize,
+              (r + margin) * cellSize,
+              cellSize, cellSize
+            );
+          }
+        }
+      }
+      container.appendChild(canvas);
     };
-    if (typeof QRCode !== 'undefined') {
+    if (typeof qrcode !== 'undefined') {
       renderQR();
     } else {
-      // Le script CDN n'est pas encore chargé (restauration de session au boot)
       window.addEventListener('load', renderQR, { once: true });
     }
   }
