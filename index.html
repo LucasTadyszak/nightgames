@@ -21,7 +21,7 @@
   <meta name="apple-mobile-web-app-title" content="NightGames">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
 
-  <link rel="stylesheet" href="css/style.css?v=20260630a">
+  <link rel="stylesheet" href="css/style.css?v=20260630b">
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Syne:wght@400;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -102,12 +102,32 @@
     </div>
     <div class="screen-body">
 
-      <!-- Room code display -->
-      <div class="room-code-card">
-        <div class="room-code-label">CODE DE LA SALLE</div>
-        <div class="room-code" id="room-code-display">----</div>
-        <div class="room-code-hint">Partage ce code à tes amis</div>
-        <button class="btn-copy" id="btn-copy-code">📋 Copier</button>
+      <!-- Invitation (host only) : QR code en principal -->
+      <div id="qr-block" class="qr-block hidden">
+        <div class="lobby-section-title">INVITER VIA QR CODE</div>
+        <div class="qr-card">
+          <div id="qr-canvas"></div>
+          <div class="qr-hint">Flashe pour rejoindre directement</div>
+        </div>
+
+        <!-- Repli : code + lien, uniquement si le scan ne marche pas -->
+        <button class="btn-code-toggle" id="btn-toggle-qr-link">
+          Pas de scan ? Rejoindre avec le code ›
+        </button>
+        <div class="qr-link-collapse" id="qr-link-collapse">
+          <div class="qr-fallback">
+            <div class="room-code-mini">
+              <span class="room-code-mini-label">CODE DE LA SALLE</span>
+              <span class="room-code-mini-val" id="room-code-display">----</span>
+              <button class="btn-copy" id="btn-copy-code">📋 Copier</button>
+            </div>
+            <div class="qr-link-row">
+              <input id="qr-link-input" class="qr-link-input" type="text" readonly
+                onclick="this.select()">
+              <button class="btn-copy" id="btn-copy-link">🔗 Copier le lien</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Players list -->
@@ -117,27 +137,6 @@
       </div>
       <div class="players-grid" id="lobby-players-grid">
         <!-- injected -->
-      </div>
-
-      <!-- QR code (host only) -->
-      <div id="qr-block" class="qr-block hidden">
-        <div class="lobby-section-title">INVITER VIA QR CODE</div>
-        <div class="qr-card">
-          <div id="qr-canvas"></div>
-          <div class="qr-hint">Flashe pour rejoindre directement</div>
-        </div>
-
-        <!-- Lien de secours dépliable (si le scan ne marche pas) -->
-        <button class="btn-code-toggle" id="btn-toggle-qr-link">
-          Afficher le lien ›
-        </button>
-        <div class="qr-link-collapse" id="qr-link-collapse">
-          <div class="qr-link-row">
-            <input id="qr-link-input" class="qr-link-input" type="text" readonly
-              onclick="this.select()">
-            <button class="btn-copy" id="btn-copy-link">🔗 Copier le lien</button>
-          </div>
-        </div>
       </div>
 
       <!-- Game picker (host only) -->
@@ -227,18 +226,18 @@
        GameEngines) doivent être chargés AVANT js/games/*.js, sinon
        chaque GameEngines['xxx'] = {...} plante (ReferenceError: TDZ
        sur le `const GameEngines` global) et le jeu ne se lance jamais. -->
-  <script src="js/logger.js?v=20260630a"></script>
-  <script src="js/config.js?v=20260630a"></script>
-  <script src="js/db.js?v=20260630a"></script>
-  <script src="js/app.js?v=20260630a"></script>
-  <script src="js/lobby.js?v=20260630a"></script>
-  <script src="js/games/cameleon.js?v=20260630a"></script>
-  <script src="js/games/verite.js?v=20260630a"></script>
-  <script src="js/games/mission.js?v=20260630a"></script>
-  <script src="js/games/famille.js?v=20260630a"></script>
-  <script src="js/games/loups.js?v=20260630a"></script>
-  <script src="js/games/changer.js?v=20260630a"></script>
-  <script src="js/qr-scanner.js?v=20260630a"></script>
+  <script src="js/logger.js?v=20260630b"></script>
+  <script src="js/config.js?v=20260630b"></script>
+  <script src="js/db.js?v=20260630b"></script>
+  <script src="js/app.js?v=20260630b"></script>
+  <script src="js/lobby.js?v=20260630b"></script>
+  <script src="js/games/cameleon.js?v=20260630b"></script>
+  <script src="js/games/verite.js?v=20260630b"></script>
+  <script src="js/games/mission.js?v=20260630b"></script>
+  <script src="js/games/famille.js?v=20260630b"></script>
+  <script src="js/games/loups.js?v=20260630b"></script>
+  <script src="js/games/changer.js?v=20260630b"></script>
+  <script src="js/qr-scanner.js?v=20260630b"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js');

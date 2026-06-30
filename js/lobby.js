@@ -118,7 +118,7 @@ function initLobby() {
     const collapse = document.getElementById('qr-link-collapse');
     const isOpen = collapse.classList.toggle('open');
     document.getElementById('btn-toggle-qr-link').textContent =
-      isOpen ? 'Masquer le lien ×' : 'Afficher le lien ›';
+      isOpen ? 'Masquer ×' : 'Pas de scan ? Rejoindre avec le code ›';
   };
   document.getElementById('btn-confirm-name').onclick = () => confirmName();
   document.getElementById('btn-leave-lobby').onclick  = () => leaveLobby();

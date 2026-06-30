@@ -345,7 +345,26 @@ body::before {
   overflow: hidden;
 }
 .qr-link-collapse.open { grid-template-rows: 1fr; }
-.qr-link-collapse > .qr-link-row { min-height: 0; }
+.qr-link-collapse > .qr-fallback { min-height: 0; }
+.qr-fallback { display:flex; flex-direction:column; gap:12px; padding-top:4px; }
+.room-code-mini {
+  display:flex; align-items:center; justify-content:center;
+  flex-wrap:wrap; gap:8px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 14px 16px;
+}
+.room-code-mini-label {
+  font-size:10px; font-weight:700; letter-spacing:2px;
+  color:var(--muted); text-transform:uppercase;
+}
+.room-code-mini-val {
+  font-family:'Space Mono',monospace;
+  font-size:26px; font-weight:700; letter-spacing:4px;
+  color:var(--text);
+}
+.room-code-mini .btn-copy { margin-top:0; }
 .qr-link-row { display:flex; flex-direction:column; gap:10px; }
 .qr-link-input {
   background: var(--surface);
