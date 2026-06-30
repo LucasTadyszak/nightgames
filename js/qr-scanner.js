@@ -59,7 +59,7 @@ const QRScanner = (() => {
           code = code.trim().toUpperCase();
           if (code.length === 4) {
             _stop();
-            close();
+            document.getElementById('qr-scanner-modal').classList.add('hidden');
             _onCode(code);
             return;
           }
@@ -76,11 +76,12 @@ const QRScanner = (() => {
 
   function _onCode(code) {
     const input = document.getElementById('join-code-input');
-    const collapse = document.getElementById('join-code-collapse');
-    if (input)   input.value = code;
-    if (collapse) collapse.classList.add('open');
-    // Lancer directement le flow de join
-    startJoinFlow();
+    if (input) input.value = code;
+    // Aller directement sur l'écran nom + avatar
+    _pendingFlow = 'join:' + code;
+    document.getElementById('name-screen-title').textContent = `Rejoindre ${code}`;
+    document.getElementById('btn-confirm-name').textContent  = 'REJOINDRE ›';
+    showScreen('name');
   }
 
   function init() {
