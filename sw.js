@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nightgames-v1';
+const CACHE_NAME = 'nightgames-v2';
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();

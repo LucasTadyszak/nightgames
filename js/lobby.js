@@ -228,39 +228,13 @@ function _enterLobby() {
     const url = `${location.origin}${location.pathname}?code=${Session.room.code}`;
     const container = document.getElementById('qr-canvas');
     container.innerHTML = '';
-    const renderQR = () => {
-      const qr = qrcode(0, 'M');
-      qr.addData(url);
-      qr.make();
-      // Rendu manuel sur canvas avec les couleurs du site
-      const cellSize = 5;
-      const margin   = 2;
-      const count    = qr.getModuleCount();
-      const canvasSize = count * cellSize + margin * 2 * cellSize;
-      const canvas = document.createElement('canvas');
-      canvas.width = canvas.height = canvasSize;
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#12121a';
-      ctx.fillRect(0, 0, canvasSize, canvasSize);
-      ctx.fillStyle = '#f0f0ff';
-      for (let r = 0; r < count; r++) {
-        for (let c = 0; c < count; c++) {
-          if (qr.isDark(r, c)) {
-            ctx.fillRect(
-              (c + margin) * cellSize,
-              (r + margin) * cellSize,
-              cellSize, cellSize
-            );
-          }
-        }
-      }
-      container.appendChild(canvas);
-    };
-    if (typeof qrcode !== 'undefined') {
-      renderQR();
-    } else {
-      document.getElementById('qrcode-script').addEventListener('load', renderQR, { once: true });
-    }
+    const img = document.createElement('img');
+    img.width  = 180;
+    img.height = 180;
+    img.alt    = `QR code salle ${Session.room.code}`;
+    img.style.borderRadius = '10px';
+    img.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(url)}&color=f0f0ff&bgcolor=12121a&margin=2`;
+    container.appendChild(img);
   }
 
   // Build games picker (host only)
