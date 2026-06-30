@@ -1,18 +1,27 @@
 // ══════════════════════════════════════
-// qr-scanner.js
-// iOS     → instructions (le web NE PEUT PAS lancer l'app Appareil Photo
-//            native ni détecter un QR : aucune API iOS ne l'autorise.
-//            On guide l'utilisateur à ouvrir sa caméra manuellement,
-//            qui affiche la bannière système → Safari charge ?code=XXXX)
-// Android → modal vidéo + BarcodeDetector
+// qr-scanner.js — scan live via getUserMedia + jsQR
+// Marche sur iOS Safari ET Android (BarcodeDetector n'existe pas sur
+// iOS Safari, donc on décode les pixels nous-mêmes avec jsQR).
+// Si la caméra est refusée/indisponible → repli : instructions + code.
 // ══════════════════════════════════════
 
 const QRScanner = (() => {
   let _stream = null;
   let _timer  = null;
+  let _canvas = null;
+  let _ctx    = null;
 
-  // ── Détection iOS ──
-  const _isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  // ── Chargement paresseux de jsQR ──
+  function _loadJsQR() {
+    return new Promise((resolve, reject) => {
+      if (window.jsQR) { resolve(); return; }
+      const s = document.createElement('script');
+      s.src     = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';
+      s.onload  = resolve;
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
 
   // ── Code commun ──────────────────────────────────────────────
   function _extractCode(raw) {
@@ -36,23 +45,7 @@ const QRScanner = (() => {
     showScreen('name');
   }
 
-  // ══════════════════════════════════════
-  // iOS — affiche les instructions
-  // Le web ne peut pas ouvrir l'app Photo : on demande à l'utilisateur
-  // de le faire lui-même. Sa caméra détecte le QR et affiche la bannière
-  // système. En la tapant, Safari charge ?code=XXXX → _onCode via app.js.
-  // ══════════════════════════════════════
-  function _openIOSInstructions() {
-    const modal = document.getElementById('qr-scanner-modal');
-    document.getElementById('qr-viewport').classList.add('hidden');
-    document.getElementById('qr-scanner-hint').classList.add('hidden');
-    document.getElementById('qr-ios-steps').classList.remove('hidden');
-    modal.classList.remove('hidden');
-  }
-
-  // ══════════════════════════════════════
-  // Android — modal vidéo + BarcodeDetector
-  // ══════════════════════════════════════
+  // ── Cycle de vie ─────────────────────────────────────────────
   function _stop() {
     clearInterval(_timer); _timer = null;
     if (_stream) { _stream.getTracks().forEach(t => t.stop()); _stream = null; }
@@ -63,65 +56,80 @@ const QRScanner = (() => {
     document.getElementById('qr-scanner-modal').classList.add('hidden');
   }
 
-  async function _openVideoScanner() {
+  // Affiche le repli (instructions + bouton code) quand la caméra échoue
+  function _showFallback(msg) {
+    _stop();
+    document.getElementById('qr-viewport').classList.add('hidden');
+    const hint = document.getElementById('qr-scanner-hint');
+    if (msg) { hint.textContent = msg; hint.classList.remove('hidden'); }
+    else     { hint.classList.add('hidden'); }
+    document.getElementById('qr-ios-steps').classList.remove('hidden');
+  }
+
+  // ══════════════════════════════════════
+  // Scan live (iOS + Android)
+  // ══════════════════════════════════════
+  async function open() {
     const modal = document.getElementById('qr-scanner-modal');
     const video = document.getElementById('qr-video');
     const hint  = document.getElementById('qr-scanner-hint');
 
+    // Réinitialise l'affichage (vue vidéo visible, repli caché)
+    document.getElementById('qr-viewport').classList.remove('hidden');
+    document.getElementById('qr-ios-steps').classList.add('hidden');
+    hint.classList.remove('hidden');
+    hint.textContent = 'Chargement…';
     modal.classList.remove('hidden');
-    hint.textContent = 'Chargement de la caméra…';
 
-    if (!('BarcodeDetector' in window)) {
-      hint.textContent = '⚠️ Scanner non supporté sur ce navigateur.';
-      return;
-    }
+    try { await _loadJsQR(); }
+    catch (_) { _showFallback('⚠️ Scanner indisponible. Ouvre ton Appareil Photo :'); return; }
 
     try {
       _stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' } }, audio: false,
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false,
       });
-    } catch (e) {
-      hint.textContent = '⚠️ Accès caméra refusé.';
+    } catch (_) {
+      _showFallback('⚠️ Caméra refusée. Ouvre ton Appareil Photo :');
       return;
     }
 
     video.srcObject = _stream;
-    video.play();
+    video.setAttribute('playsinline', '');   // requis iOS Safari
+    try { await video.play(); } catch (_) {}
 
-    const detector = new BarcodeDetector({ formats: ['qr_code'] });
+    if (!_canvas) {
+      _canvas = document.createElement('canvas');
+      _ctx    = _canvas.getContext('2d', { willReadFrequently: true });
+    }
+
     hint.textContent = 'Pointe sur le QR code du host';
 
-    _timer = setInterval(async () => {
-      if (video.readyState < video.HAVE_ENOUGH_DATA) return;
-      try {
-        const codes = await detector.detect(video);
-        if (codes.length) {
-          _stop();
-          _closeModal();
-          _onCode(codes[0].rawValue);
-        }
-      } catch (_) {}
-    }, 150);
-  }
+    _timer = setInterval(() => {
+      if (video.readyState < video.HAVE_ENOUGH_DATA || !video.videoWidth) return;
 
-  // ── Entrée publique ──────────────────────────────────────────
-  function open() {
-    if (_isIOS) {
-      _openIOSInstructions();
-    } else {
-      // S'assure que la vue vidéo est visible (au cas où réutilisée)
-      document.getElementById('qr-viewport').classList.remove('hidden');
-      document.getElementById('qr-scanner-hint').classList.remove('hidden');
-      document.getElementById('qr-ios-steps').classList.add('hidden');
-      _openVideoScanner();
-    }
+      _canvas.width  = video.videoWidth;
+      _canvas.height = video.videoHeight;
+      _ctx.drawImage(video, 0, 0);
+
+      const pixels = _ctx.getImageData(0, 0, _canvas.width, _canvas.height);
+      const result = jsQR(pixels.data, pixels.width, pixels.height, {
+        inversionAttempts: 'attemptBoth',
+      });
+
+      if (result && result.data) {
+        _stop();
+        _closeModal();
+        _onCode(result.data);
+      }
+    }, 200);
   }
 
   function init() {
     document.getElementById('btn-scan-qr').onclick       = () => open();
     document.getElementById('btn-close-scanner').onclick = () => _closeModal();
 
-    // iOS : « Saisir le code » ferme le modal et ouvre le champ code
+    // Repli : « Saisir le code » ferme le modal et ouvre le champ code
     const iosCode = document.getElementById('btn-ios-use-code');
     if (iosCode) iosCode.onclick = () => {
       _closeModal();
