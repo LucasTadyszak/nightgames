@@ -228,13 +228,21 @@ function _enterLobby() {
     const url = `${location.origin}${location.pathname}?code=${Session.room.code}`;
     const container = document.getElementById('qr-canvas');
     container.innerHTML = '';
-    QRCode.toCanvas(document.createElement('canvas'), url, {
-      width: 180,
-      margin: 2,
-      color: { dark: '#f0f0ff', light: '#12121a' },
-    }, (err, canvas) => {
-      if (!err) container.appendChild(canvas);
-    });
+    const renderQR = () => {
+      QRCode.toCanvas(document.createElement('canvas'), url, {
+        width: 180,
+        margin: 2,
+        color: { dark: '#f0f0ff', light: '#12121a' },
+      }, (err, canvas) => {
+        if (!err) container.appendChild(canvas);
+      });
+    };
+    if (typeof QRCode !== 'undefined') {
+      renderQR();
+    } else {
+      // Le script CDN n'est pas encore chargé (restauration de session au boot)
+      window.addEventListener('load', renderQR, { once: true });
+    }
   }
 
   // Build games picker (host only)
