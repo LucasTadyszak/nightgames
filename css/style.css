@@ -723,6 +723,80 @@ body::before {
 .hidden { display:none !important; }
 
 /* ══════════════════════════════════════
+   INSTALL TUTO ("Ajouter à l'écran d'accueil")
+   Affiché une fois à la première visite — voir js/install-prompt.js
+══════════════════════════════════════ */
+.install-backdrop {
+  position: fixed; inset: 0; z-index: 250;
+  background: rgba(0,0,0,.6);
+  display: flex; align-items: flex-end; justify-content: center;
+  padding: 16px;
+  backdrop-filter: blur(3px);
+  opacity: 0; transition: opacity .25s ease;
+}
+.install-backdrop.show { opacity: 1; }
+
+@media (min-width: 480px) {
+  .install-backdrop { align-items: center; }
+}
+
+.install-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-lg); padding: 28px 22px;
+  width: 100%; max-width: 380px;
+  box-shadow: 0 -12px 50px rgba(0,0,0,.5);
+  transform: translateY(24px); transition: transform .25s ease;
+}
+.install-backdrop.show .install-card { transform: translateY(0); }
+
+.install-hero {
+  font-size: 48px; line-height: 1; text-align: center;
+  margin-bottom: 14px;
+  filter: drop-shadow(0 6px 18px var(--glow2));
+}
+.install-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 26px; letter-spacing: 2px; text-align: center;
+  margin-bottom: 8px;
+}
+.install-sub {
+  font-size: 14px; color: var(--muted); text-align: center;
+  line-height: 1.5; margin-bottom: 22px;
+}
+
+.install-steps {
+  list-style: none; margin: 0 0 22px; padding: 0;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.install-step {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--r-md); padding: 14px;
+}
+.install-step-num {
+  flex: 0 0 28px; width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent1), var(--accent2));
+  font-family: 'Bebas Neue', sans-serif; font-size: 16px; color: #fff;
+}
+.install-step-txt {
+  font-size: 14px; line-height: 1.4; color: var(--text);
+}
+.install-step-txt b { color: var(--accent3); }
+.install-icon-ios {
+  display: inline-flex; vertical-align: middle;
+  color: var(--accent5);
+}
+.install-icon-plus {
+  display: inline-block; font-weight: 700; color: var(--accent3);
+}
+
+.install-actions {
+  display: flex; flex-direction: column; gap: 10px;
+}
+
+/* ══════════════════════════════════════
    TOAST
 ══════════════════════════════════════ */
 .toast {

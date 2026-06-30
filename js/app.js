@@ -202,6 +202,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const restored = urlCode ? false : await tryRestoreSession();
   Logger.info('app', restored ? 'Session restaurée' : 'Aucune session à restaurer');
+
+  // Tuto "Ajouter à l'écran d'accueil" — première visite uniquement.
+  // On le reporte si le joueur arrive via un lien QR (urlCode) ou si une
+  // session est restaurée : on ne veut pas s'interposer dans ces flux.
+  InstallPrompt.maybeShow({ skip: !!urlCode || restored });
 });
 
 window.addEventListener('error', (e) => {
