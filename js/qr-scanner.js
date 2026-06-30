@@ -86,7 +86,11 @@ const QRScanner = (() => {
 
     try {
       _stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' } },
+        video: {
+          facingMode: { ideal: 'environment' },
+          width:  { ideal: 1280 },
+          height: { ideal: 720 },
+        },
         audio: false,
       });
     } catch (_) {
@@ -103,26 +107,51 @@ const QRScanner = (() => {
       _ctx    = _canvas.getContext('2d', { willReadFrequently: true });
     }
 
+    // Fast-path natif (Android/Chrome) : décodage GPU, bien plus rapide
+    // que jsQR. Absent sur iOS Safari → on retombe sur jsQR.
+    let detector = null;
+    if ('BarcodeDetector' in window) {
+      try {
+        const fmts = await BarcodeDetector.getSupportedFormats();
+        if (fmts.includes('qr_code')) detector = new BarcodeDetector({ formats: ['qr_code'] });
+      } catch (_) {}
+    }
+
     hint.textContent = 'Pointe sur le QR code du host';
 
-    _timer = setInterval(() => {
+    const T   = 512;     // côté du carré décodé
+    let busy  = false;   // évite d'empiler les décodages
+
+    _timer = setInterval(async () => {
+      if (busy) return;
       if (video.readyState < video.HAVE_ENOUGH_DATA || !video.videoWidth) return;
+      busy = true;
+      try {
+        // ── Fast-path natif ──
+        if (detector) {
+          const codes = await detector.detect(video);
+          if (codes.length && codes[0].rawValue) {
+            _stop(); _closeModal(); _onCode(codes[0].rawValue); return;
+          }
+          busy = false; return;
+        }
 
-      _canvas.width  = video.videoWidth;
-      _canvas.height = video.videoHeight;
-      _ctx.drawImage(video, 0, 0);
+        // ── jsQR : recadre le carré central (ce que l'utilisateur vise) et
+        // le décode en 512px → QR net, peu de pixels = rapide ET fiable. ──
+        const side = Math.min(video.videoWidth, video.videoHeight);
+        const sx   = (video.videoWidth  - side) / 2;
+        const sy   = (video.videoHeight - side) / 2;
+        _canvas.width = _canvas.height = T;
+        _ctx.drawImage(video, sx, sy, side, side, 0, 0, T, T);
 
-      const pixels = _ctx.getImageData(0, 0, _canvas.width, _canvas.height);
-      const result = jsQR(pixels.data, pixels.width, pixels.height, {
-        inversionAttempts: 'attemptBoth',
-      });
-
-      if (result && result.data) {
-        _stop();
-        _closeModal();
-        _onCode(result.data);
-      }
-    }, 200);
+        const px = _ctx.getImageData(0, 0, T, T);
+        const result = jsQR(px.data, T, T, { inversionAttempts: 'onlyInvert' });
+        if (result && result.data) {
+          _stop(); _closeModal(); _onCode(result.data); return;
+        }
+      } catch (_) {}
+      busy = false;
+    }, 80);
   }
 
   function init() {
