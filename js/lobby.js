@@ -259,7 +259,7 @@ function _enterLobby() {
     if (typeof qrcode !== 'undefined') {
       renderQR();
     } else {
-      window.addEventListener('load', renderQR, { once: true });
+      document.getElementById('qrcode-script').addEventListener('load', renderQR, { once: true });
     }
   }
 
