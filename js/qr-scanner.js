@@ -1,7 +1,9 @@
 // ══════════════════════════════════════
 // qr-scanner.js
-// iOS     → input capture="environment" (ouvre l'app Appareil Photo native,
-//            qui détecte le QR et affiche une notif pour ouvrir le lien)
+// iOS     → instructions (le web NE PEUT PAS lancer l'app Appareil Photo
+//            native ni détecter un QR : aucune API iOS ne l'autorise.
+//            On guide l'utilisateur à ouvrir sa caméra manuellement,
+//            qui affiche la bannière système → Safari charge ?code=XXXX)
 // Android → modal vidéo + BarcodeDetector
 // ══════════════════════════════════════
 
@@ -35,17 +37,17 @@ const QRScanner = (() => {
   }
 
   // ══════════════════════════════════════
-  // iOS — ouvre l'Appareil Photo natif
-  // La caméra détecte le QR et affiche une bannière système.
-  // En tapant la bannière, Safari charge ?code=XXXX → _onCode via app.js.
+  // iOS — affiche les instructions
+  // Le web ne peut pas ouvrir l'app Photo : on demande à l'utilisateur
+  // de le faire lui-même. Sa caméra détecte le QR et affiche la bannière
+  // système. En la tapant, Safari charge ?code=XXXX → _onCode via app.js.
   // ══════════════════════════════════════
-  function _openIOSCamera() {
-    const input = document.createElement('input');
-    input.type    = 'file';
-    input.accept  = 'image/*';
-    input.capture = 'environment';
-    // Pas besoin de decoder : la bannière iOS gère la navigation
-    input.click();
+  function _openIOSInstructions() {
+    const modal = document.getElementById('qr-scanner-modal');
+    document.getElementById('qr-viewport').classList.add('hidden');
+    document.getElementById('qr-scanner-hint').classList.add('hidden');
+    document.getElementById('qr-ios-steps').classList.remove('hidden');
+    modal.classList.remove('hidden');
   }
 
   // ══════════════════════════════════════
@@ -105,8 +107,12 @@ const QRScanner = (() => {
   // ── Entrée publique ──────────────────────────────────────────
   function open() {
     if (_isIOS) {
-      _openIOSCamera();
+      _openIOSInstructions();
     } else {
+      // S'assure que la vue vidéo est visible (au cas où réutilisée)
+      document.getElementById('qr-viewport').classList.remove('hidden');
+      document.getElementById('qr-scanner-hint').classList.remove('hidden');
+      document.getElementById('qr-ios-steps').classList.add('hidden');
       _openVideoScanner();
     }
   }
@@ -114,6 +120,18 @@ const QRScanner = (() => {
   function init() {
     document.getElementById('btn-scan-qr').onclick       = () => open();
     document.getElementById('btn-close-scanner').onclick = () => _closeModal();
+
+    // iOS : « Saisir le code » ferme le modal et ouvre le champ code
+    const iosCode = document.getElementById('btn-ios-use-code');
+    if (iosCode) iosCode.onclick = () => {
+      _closeModal();
+      const collapse = document.getElementById('join-code-collapse');
+      if (collapse && !collapse.classList.contains('open')) {
+        document.getElementById('btn-toggle-code-input').click();
+      } else {
+        document.getElementById('join-code-input').focus();
+      }
+    };
   }
 
   return { init, open };

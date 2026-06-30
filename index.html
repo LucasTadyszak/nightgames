@@ -166,10 +166,23 @@
         <div class="qr-scanner-title">SCANNER LE QR CODE</div>
         <button class="qr-scanner-close" id="btn-close-scanner">✕</button>
       </div>
-      <div class="qr-viewport">
+      <div class="qr-viewport" id="qr-viewport">
         <video id="qr-video" playsinline muted></video>
       </div>
       <div class="qr-scanner-hint" id="qr-scanner-hint">Pointe sur le QR code du host</div>
+
+      <!-- Vue iOS : impossible d'ouvrir l'app Photo depuis le web,
+           on guide l'utilisateur à le faire manuellement -->
+      <div class="qr-ios-steps hidden" id="qr-ios-steps">
+        <div class="qr-ios-emoji">📷</div>
+        <ol class="qr-ios-list">
+          <li>Ouvre l'app <b>Appareil Photo</b> de ton iPhone</li>
+          <li>Vise le <b>QR code</b> affiché par le host</li>
+          <li>Tape la <b>bannière</b> jaune qui apparaît</li>
+        </ol>
+        <div class="qr-ios-or">ou rejoins avec le code</div>
+        <button class="btn-code-toggle" id="btn-ios-use-code">Saisir le code ›</button>
+      </div>
     </div>
   </div>
 
