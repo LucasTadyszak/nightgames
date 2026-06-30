@@ -105,6 +105,15 @@
         <!-- injected -->
       </div>
 
+      <!-- QR code (host only) -->
+      <div id="qr-block" class="qr-block hidden">
+        <div class="lobby-section-title">INVITER VIA QR CODE</div>
+        <div class="qr-card">
+          <div id="qr-canvas"></div>
+          <div class="qr-hint">Flashe pour rejoindre directement</div>
+        </div>
+      </div>
+
       <!-- Game picker (host only) -->
       <div id="host-controls" class="host-controls hidden">
         <div class="lobby-section-title">CHOISIR UN JEU</div>
@@ -156,6 +165,8 @@
 
   <!-- Supabase CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- QR Code -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
 
   <!-- App modules -->
   <!-- ORDRE IMPORTANT : logger.js et app.js (qui déclare le registre

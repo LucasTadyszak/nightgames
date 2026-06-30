@@ -176,6 +176,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   // jeux n'est pas chargé / que la restauration de session n'a pas
   // confirmé une session valide — pas de flash d'écran vide puisque
   // #screen-home a déjà la classe "active" dans le HTML statique.
+  // Pré-remplir le code depuis ?code=XXXX (lien QR)
+  const urlCode = new URLSearchParams(location.search).get('code');
+  if (urlCode) {
+    const input = document.getElementById('join-code-input');
+    if (input) input.value = urlCode.toUpperCase();
+    history.replaceState(null, '', location.pathname);
+  }
+
   showScreen('home');
 
   try {

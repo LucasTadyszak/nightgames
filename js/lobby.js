@@ -218,9 +218,24 @@ function _enterLobby() {
   // Show room code
   document.getElementById('room-code-display').textContent = Session.room.code;
 
-  // Show/hide host controls
+  // Show/hide host controls & QR
   document.getElementById('host-controls').classList.toggle('hidden', !Session.isHost);
+  document.getElementById('qr-block').classList.toggle('hidden', !Session.isHost);
   document.getElementById('guest-waiting').classList.toggle('hidden', Session.isHost);
+
+  // QR code pointant vers l'URL avec le code pré-rempli
+  if (Session.isHost) {
+    const url = `${location.origin}${location.pathname}?code=${Session.room.code}`;
+    const container = document.getElementById('qr-canvas');
+    container.innerHTML = '';
+    QRCode.toCanvas(document.createElement('canvas'), url, {
+      width: 180,
+      margin: 2,
+      color: { dark: '#f0f0ff', light: '#12121a' },
+    }, (err, canvas) => {
+      if (!err) container.appendChild(canvas);
+    });
+  }
 
   // Build games picker (host only)
   if (Session.isHost) _renderGamesPicker();
