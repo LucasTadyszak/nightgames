@@ -1,34 +1,18 @@
 // ══════════════════════════════════════
-// qr-scanner.js — getUserMedia + jsQR
+// qr-scanner.js
+// iOS     → input capture="environment" (ouvre l'app Appareil Photo native,
+//            qui détecte le QR et affiche une notif pour ouvrir le lien)
+// Android → modal vidéo + BarcodeDetector
 // ══════════════════════════════════════
 
 const QRScanner = (() => {
-  let _stream   = null;
-  let _timer    = null;
-  let _canvas   = null;
-  let _ctx      = null;
+  let _stream = null;
+  let _timer  = null;
 
-  function _loadJsQR() {
-    return new Promise((resolve, reject) => {
-      if (window.jsQR) { resolve(); return; }
-      const s = document.createElement('script');
-      s.src     = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';
-      s.onload  = resolve;
-      s.onerror = reject;
-      document.head.appendChild(s);
-    });
-  }
+  // ── Détection iOS ──
+  const _isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
-  function _stop() {
-    clearInterval(_timer); _timer = null;
-    if (_stream) { _stream.getTracks().forEach(t => t.stop()); _stream = null; }
-  }
-
-  function _closeModal() {
-    _stop();
-    document.getElementById('qr-scanner-modal').classList.add('hidden');
-  }
-
+  // ── Code commun ──────────────────────────────────────────────
   function _extractCode(raw) {
     let code = raw.trim();
     try {
@@ -50,57 +34,81 @@ const QRScanner = (() => {
     showScreen('name');
   }
 
-  async function open() {
+  // ══════════════════════════════════════
+  // iOS — ouvre l'Appareil Photo natif
+  // La caméra détecte le QR et affiche une bannière système.
+  // En tapant la bannière, Safari charge ?code=XXXX → _onCode via app.js.
+  // ══════════════════════════════════════
+  function _openIOSCamera() {
+    const input = document.createElement('input');
+    input.type    = 'file';
+    input.accept  = 'image/*';
+    input.capture = 'environment';
+    // Pas besoin de decoder : la bannière iOS gère la navigation
+    input.click();
+  }
+
+  // ══════════════════════════════════════
+  // Android — modal vidéo + BarcodeDetector
+  // ══════════════════════════════════════
+  function _stop() {
+    clearInterval(_timer); _timer = null;
+    if (_stream) { _stream.getTracks().forEach(t => t.stop()); _stream = null; }
+  }
+
+  function _closeModal() {
+    _stop();
+    document.getElementById('qr-scanner-modal').classList.add('hidden');
+  }
+
+  async function _openVideoScanner() {
     const modal = document.getElementById('qr-scanner-modal');
     const video = document.getElementById('qr-video');
     const hint  = document.getElementById('qr-scanner-hint');
 
     modal.classList.remove('hidden');
-    hint.textContent = 'Chargement…';
+    hint.textContent = 'Chargement de la caméra…';
 
-    try { await _loadJsQR(); } catch (e) {
-      hint.textContent = '⚠️ Scanner indisponible, utilise le code à la place.';
+    if (!('BarcodeDetector' in window)) {
+      hint.textContent = '⚠️ Scanner non supporté sur ce navigateur.';
       return;
     }
 
     try {
       _stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' } },
-        audio: false,
+        video: { facingMode: { ideal: 'environment' } }, audio: false,
       });
     } catch (e) {
-      hint.textContent = '⚠️ Accès caméra refusé — autorise-le dans les réglages iPhone.';
+      hint.textContent = '⚠️ Accès caméra refusé.';
       return;
     }
 
     video.srcObject = _stream;
     video.play();
 
-    if (!_canvas) {
-      _canvas = document.createElement('canvas');
-      _ctx    = _canvas.getContext('2d', { willReadFrequently: true });
-    }
-
+    const detector = new BarcodeDetector({ formats: ['qr_code'] });
     hint.textContent = 'Pointe sur le QR code du host';
 
-    _timer = setInterval(() => {
-      if (video.readyState < video.HAVE_ENOUGH_DATA || !video.videoWidth) return;
-
-      _canvas.width  = video.videoWidth;
-      _canvas.height = video.videoHeight;
-      _ctx.drawImage(video, 0, 0);
-
-      const pixels = _ctx.getImageData(0, 0, _canvas.width, _canvas.height);
-      const result = jsQR(pixels.data, pixels.width, pixels.height, {
-        inversionAttempts: 'dontInvert',
-      });
-
-      if (result) {
-        _stop();
-        document.getElementById('qr-scanner-modal').classList.add('hidden');
-        _onCode(result.data);
-      }
+    _timer = setInterval(async () => {
+      if (video.readyState < video.HAVE_ENOUGH_DATA) return;
+      try {
+        const codes = await detector.detect(video);
+        if (codes.length) {
+          _stop();
+          _closeModal();
+          _onCode(codes[0].rawValue);
+        }
+      } catch (_) {}
     }, 150);
+  }
+
+  // ── Entrée publique ──────────────────────────────────────────
+  function open() {
+    if (_isIOS) {
+      _openIOSCamera();
+    } else {
+      _openVideoScanner();
+    }
   }
 
   function init() {
