@@ -179,8 +179,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Pré-remplir le code depuis ?code=XXXX (lien QR)
   const urlCode = new URLSearchParams(location.search).get('code');
   if (urlCode) {
+    // On efface toute session sauvegardée pour ne pas restaurer une vieille
+    // salle à la place de celle vers laquelle pointe le QR code.
+    _clearSavedSession();
     const input = document.getElementById('join-code-input');
     if (input) input.value = urlCode.toUpperCase();
+    // Ouvrir le collapse et lancer directement le flow de join
+    const collapse = document.getElementById('join-code-collapse');
+    if (collapse) collapse.classList.add('open');
     history.replaceState(null, '', location.pathname);
   }
 
@@ -193,7 +199,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     showToast('Erreur de chargement du contenu des jeux. Rechargez la page.');
   }
 
-  const restored = await tryRestoreSession();
+  const restored = urlCode ? false : await tryRestoreSession();
   Logger.info('app', restored ? 'Session restaurée' : 'Aucune session à restaurer');
 });
 

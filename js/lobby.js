@@ -107,6 +107,13 @@ function initLobby() {
 
   document.getElementById('btn-create-lobby').onclick = () => startCreateFlow();
   document.getElementById('btn-join-lobby').onclick   = () => startJoinFlow();
+  document.getElementById('btn-toggle-code-input').onclick = () => {
+    const collapse = document.getElementById('join-code-collapse');
+    const isOpen = collapse.classList.toggle('open');
+    document.getElementById('btn-toggle-code-input').textContent =
+      isOpen ? 'Masquer la saisie ×' : 'Rejoindre avec un code ›';
+    if (isOpen) setTimeout(() => document.getElementById('join-code-input').focus(), 320);
+  };
   document.getElementById('btn-confirm-name').onclick = () => confirmName();
   document.getElementById('btn-leave-lobby').onclick  = () => leaveLobby();
   document.getElementById('btn-copy-code').onclick    = () => copyCode();

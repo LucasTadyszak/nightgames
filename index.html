@@ -49,12 +49,25 @@
       <div class="divider-text">ou</div>
 
       <div class="join-block">
-        <div class="join-label">Rejoindre avec un code</div>
-        <div class="join-input-row">
-          <input id="join-code-input" class="code-input" type="text"
-            placeholder="XXXX" maxlength="4" autocomplete="off"
-            oninput="this.value=this.value.toUpperCase()">
-          <button class="btn-join" id="btn-join-lobby">GO</button>
+        <div class="join-qr-hint">
+          <span class="join-qr-icon">📷</span>
+          <div>
+            <div class="join-qr-title">FLASHE LE QR CODE</div>
+            <div class="join-qr-sub">Scanne le QR affiché chez le host</div>
+          </div>
+        </div>
+
+        <button class="btn-code-toggle" id="btn-toggle-code-input">
+          Rejoindre avec un code ›
+        </button>
+
+        <div class="join-code-collapse" id="join-code-collapse">
+          <div class="join-input-row">
+            <input id="join-code-input" class="code-input" type="text"
+              placeholder="XXXX" maxlength="4" autocomplete="off"
+              oninput="this.value=this.value.toUpperCase()">
+            <button class="btn-join" id="btn-join-lobby">GO</button>
+          </div>
         </div>
       </div>
     </main>
