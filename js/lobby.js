@@ -236,11 +236,13 @@ function _enterLobby() {
     const container = document.getElementById('qr-canvas');
     container.innerHTML = '';
     const img = document.createElement('img');
-    img.width  = 180;
-    img.height = 180;
+    img.width  = 240;
+    img.height = 240;
     img.alt    = `QR code salle ${Session.room.code}`;
-    img.style.borderRadius = '10px';
-    img.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(url)}&color=f0f0ff&bgcolor=12121a&margin=2`;
+    // Noir sur blanc + marge large : une caméra qui filme un écran lit
+    // ça bien plus vite/fiablement qu'un QR sombre. Fond blanc = quiet zone.
+    img.style.cssText = 'border-radius:10px;background:#fff;padding:10px;display:block;';
+    img.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(url)}&margin=12`;
     container.appendChild(img);
   }
 

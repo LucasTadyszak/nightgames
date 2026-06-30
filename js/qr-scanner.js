@@ -98,6 +98,16 @@ const QRScanner = (() => {
       return;
     }
 
+    // Autofocus continu : sans ça, la caméra reste souvent floue sur un
+    // écran proche pendant de longues secondes → scan qui n'accroche pas.
+    try {
+      const track = _stream.getVideoTracks()[0];
+      const caps  = track.getCapabilities ? track.getCapabilities() : {};
+      if (caps.focusMode && caps.focusMode.includes('continuous')) {
+        await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+      }
+    } catch (_) {}
+
     video.srcObject = _stream;
     video.setAttribute('playsinline', '');   // requis iOS Safari
     try { await video.play(); } catch (_) {}
@@ -145,7 +155,7 @@ const QRScanner = (() => {
         _ctx.drawImage(video, sx, sy, side, side, 0, 0, T, T);
 
         const px = _ctx.getImageData(0, 0, T, T);
-        const result = jsQR(px.data, T, T, { inversionAttempts: 'onlyInvert' });
+        const result = jsQR(px.data, T, T, { inversionAttempts: 'attemptBoth' });
         if (result && result.data) {
           _stop(); _closeModal(); _onCode(result.data); return;
         }
