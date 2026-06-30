@@ -1,28 +1,21 @@
 // ══════════════════════════════════════
-// qr-scanner.js — Scan QR via caméra (temps réel)
-// - BarcodeDetector si dispo (Android Chrome) : natif, rapide
-// - Sinon (iOS Safari) : getUserMedia + jsQR frame-by-frame
+// qr-scanner.js — html5-qrcode (iOS + Android)
 // ══════════════════════════════════════
 
 const QRScanner = (() => {
-  let _stream  = null;
-  let _rafId   = null;
-  let _canvas  = null;
-  let _ctx     = null;
+  let _scanner = null;
 
-  // ── Chargement paresseux de jsQR ──
-  function _loadJsQR() {
+  function _loadLib() {
     return new Promise((resolve, reject) => {
-      if (window.jsQR) { resolve(); return; }
+      if (window.Html5Qrcode) { resolve(); return; }
       const s = document.createElement('script');
-      s.src     = 'https://unpkg.com/jsqr@1.4.0/dist/jsQR.js';
+      s.src     = 'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js';
       s.onload  = resolve;
-      s.onerror = () => reject(new Error('jsQR indisponible'));
+      s.onerror = () => reject(new Error('Lib QR indisponible'));
       document.head.appendChild(s);
     });
   }
 
-  // ── Extraction du code 4 lettres depuis une valeur brute ──
   function _extractCode(raw) {
     let code = raw.trim();
     try {
@@ -33,7 +26,6 @@ const QRScanner = (() => {
     return code.toUpperCase();
   }
 
-  // ── Aller directement sur l'écran nom + avatar ──
   function _onCode(code) {
     if (code.length !== 4) { showToast('QR invalide, réessaie'); return; }
     const input = document.getElementById('join-code-input');
@@ -44,87 +36,46 @@ const QRScanner = (() => {
     showScreen('name');
   }
 
-  // ── Arrêt propre de la caméra ──
-  function _stop() {
-    if (_rafId)  { cancelAnimationFrame(_rafId); _rafId = null; }
-    if (_stream) { _stream.getTracks().forEach(t => t.stop()); _stream = null; }
+  async function _stop() {
+    if (_scanner) {
+      try { await _scanner.stop(); } catch (_) {}
+      _scanner.clear();
+      _scanner = null;
+    }
   }
 
-  function _closeModal() {
-    _stop();
+  async function _closeModal() {
+    await _stop();
     document.getElementById('qr-scanner-modal').classList.add('hidden');
   }
 
-  // ── Boucle de scan avec BarcodeDetector ──
-  function _loopNative(video, detector) {
-    _rafId = requestAnimationFrame(async () => {
-      if (!_stream) return;
-      try {
-        const codes = await detector.detect(video);
-        if (codes.length) {
-          const code = _extractCode(codes[0].rawValue);
-          _closeModal();
-          _onCode(code);
-          return;
-        }
-      } catch (_) {}
-      _loopNative(video, detector);
-    });
-  }
-
-  // ── Boucle de scan avec jsQR (canvas frame-by-frame) ──
-  function _loopJsQR(video) {
-    _rafId = requestAnimationFrame(() => {
-      if (!_stream || video.readyState < video.HAVE_ENOUGH_DATA) {
-        _loopJsQR(video);
-        return;
-      }
-      _canvas.width  = video.videoWidth;
-      _canvas.height = video.videoHeight;
-      _ctx.drawImage(video, 0, 0);
-      const pixels = _ctx.getImageData(0, 0, _canvas.width, _canvas.height);
-      const result = jsQR(pixels.data, pixels.width, pixels.height, {
-        inversionAttempts: 'dontInvert',
-      });
-      if (result) {
-        const code = _extractCode(result.data);
-        _closeModal();
-        _onCode(code);
-        return;
-      }
-      _loopJsQR(video);
-    });
-  }
-
-  // ── Ouverture du scanner ──
   async function open() {
     const modal = document.getElementById('qr-scanner-modal');
-    const video = document.getElementById('qr-video');
     const hint  = document.getElementById('qr-scanner-hint');
 
     modal.classList.remove('hidden');
-    hint.textContent = 'Pointe sur le QR code du host';
+    hint.textContent = 'Chargement de la caméra…';
 
-    // Préparer le canvas hors-écran pour jsQR
-    if (!_canvas) {
-      _canvas = document.createElement('canvas');
-      _ctx    = _canvas.getContext('2d');
+    try {
+      await _loadLib();
+    } catch (e) {
+      hint.textContent = '⚠️ Impossible de charger le scanner.';
+      return;
     }
 
     try {
-      _stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' }, audio: false,
-      });
-      video.srcObject = _stream;
-      await video.play();
-
-      if ('BarcodeDetector' in window) {
-        const detector = new BarcodeDetector({ formats: ['qr_code'] });
-        _loopNative(video, detector);
-      } else {
-        await _loadJsQR();
-        _loopJsQR(video);
-      }
+      _scanner = new Html5Qrcode('qr-reader');
+      await _scanner.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 220, height: 220 }, aspectRatio: 1.0 },
+        async (decodedText) => {
+          const code = _extractCode(decodedText);
+          await _closeModal();
+          _onCode(code);
+        },
+        () => {} // erreurs par frame ignorées
+      );
+      hint.textContent = 'Pointe sur le QR code du host';
     } catch (e) {
       hint.textContent = '⚠️ Accès caméra refusé — autorise-le dans les réglages.';
     }
