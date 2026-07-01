@@ -157,17 +157,23 @@
 .cs-opp-head .cs-opp-ava { font-size: 16px; }
 .cs-opp-head .cs-opp-name { font-size: 12px; font-weight: 700; max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cs-opp-head .cs-opp-score { margin-left: auto; font-family: 'Space Mono', monospace; font-size: 12px; color: var(--c-accent2); }
-.cs-mini-grid { display: grid; grid-template-columns: repeat(4, 16px); grid-auto-rows: 22px; gap: 3px; }
+.cs-mini-grid { display: grid; grid-template-columns: repeat(4, 22px); grid-auto-rows: 30px; gap: 4px; }
 .cs-mini-cell {
-  border-radius: 4px; font-size: 9px; font-weight: 700;
+  border-radius: 5px; font-size: 12px; font-weight: 700;
   display: flex; align-items: center; justify-content: center;
   background: var(--c-surface2); color: var(--c-text);
+  border: 1px solid var(--c-border);
 }
-.cs-mini-cell.hidden { background: var(--c-accent); opacity: .5; }
-/* Carte encore face cachée pour l'adversaire, mais révélée en avance :
-   valeur affichée en semi-transparence avec un liseré pointillé. */
-.cs-mini-cell.peek { opacity: .55; outline: 1px dashed rgba(255,255,255,.35); outline-offset: -1px; }
-.cs-mini-cell.removed { opacity: 0; }
+/* Carte cachée : dos de carte clairement visible (pleine opacité) pour que
+   la grille 4×3 entière soit affichée dès le départ.
+   NB : classe « covered » et non « hidden » car .hidden est une utilitaire
+   globale (display:none !important) dans style.css. */
+.cs-mini-cell.covered {
+  background: linear-gradient(135deg, var(--c-accent), var(--c-accent2));
+  opacity: 1; font-size: 12px; border-color: rgba(255, 255, 255, .18);
+}
+/* Emplacement d'une colonne retirée : cadre vide (pas de carte). */
+.cs-mini-cell.removed { opacity: 0; border-color: transparent; }
 
 /* Zone centrale : pioche + défausse */
 .cs-center {

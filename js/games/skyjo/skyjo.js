@@ -370,12 +370,14 @@
   }
 
   function miniGrid(grid) {
-    // On révèle TOUTES les cartes des adversaires (les cartes réellement
-    // face cachée sont marquées ".peek" pour rester visuellement distinctes).
+    // Grille complète de l'adversaire : on affiche les 12 emplacements en
+    // respectant leur position. Les cartes cachées restent cachées (dos),
+    // les cartes visibles montrent leur valeur, les colonnes retirées
+    // laissent un emplacement vide.
     return `<div class="cs-mini-grid">${grid.map((c) => {
       if (c.removed) return `<div class="cs-mini-cell removed"></div>`;
-      const peek = c.faceUp ? '' : ' peek';
-      return `<div class="cs-mini-cell ${valueClass(c.value)}${peek}">${c.value}</div>`;
+      if (!c.faceUp) return `<div class="cs-mini-cell covered">🎴</div>`;
+      return `<div class="cs-mini-cell ${valueClass(c.value)}">${c.value}</div>`;
     }).join('')}</div>`;
   }
 
@@ -393,7 +395,7 @@
         <div class="cs-opp-head">
           <span class="cs-opp-ava">${AVATARS[i]}</span>
           <span class="cs-opp-name">${escapeHtml(p.name)}</span>
-          <span class="cs-opp-score" title="Somme de la grille">${E.gridScore(p.grid)}</span>
+          <span class="cs-opp-score" title="Somme des cartes visibles">${E.gridScore(p.grid, true)}</span>
         </div>
         ${miniGrid(p.grid)}
       </div>`).join('');
@@ -428,7 +430,7 @@
           <div class="cs-my-head">
             <span class="cs-my-ava">${AVATARS[me]}</span>
             <span class="cs-my-name">${escapeHtml(S.players[me].name)}</span>
-            <span class="cs-my-score">Manches : <b id="cs-mytotal">${S.players[me].totalScore}</b></span>
+            <span class="cs-my-score">Grille : <b>${E.gridScore(S.players[me].grid, true)}</b> · Manches : ${S.players[me].totalScore}</span>
           </div>
           <div class="cs-my-grid">${myGrid}</div>
         </div>
