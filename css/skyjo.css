@@ -242,6 +242,13 @@
   width: 66px; margin: 0 auto;
 }
 
+/* Emplacement de défausse vide : logo interdit, pas de texte */
+.cs-empty {
+  display: flex; align-items: center; justify-content: center;
+  border: 2px dashed var(--c-border); background: var(--c-surface);
+  font-size: 24px; opacity: .4;
+}
+
 /* ── Barre d'action ─────────────────────────────────────────────────── */
 .cs-actions { display: flex; gap: 10px; justify-content: center; padding: 10px 16px 2px; flex-wrap: wrap; }
 .cs-action {
