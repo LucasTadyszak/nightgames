@@ -22,6 +22,7 @@
   <link rel="apple-touch-icon" href="icons/icon-192.png">
 
   <link rel="stylesheet" href="css/style.css?v=20260630b">
+  <link rel="stylesheet" href="css/skyjo.css?v=20260701a">
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Syne:wght@400;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -71,6 +72,19 @@
           </div>
         </div>
       </div>
+
+      <div class="divider-text">jouer hors ligne</div>
+
+      <!-- Cascade : jeu de cartes solo / local, 100 % hors ligne (aucune
+           salle Supabase requise). Lancé dans son propre overlay. -->
+      <button class="btn-hero" id="btn-play-cascade">
+        <span class="btn-hero-icon">🎴</span>
+        <div>
+          <div class="btn-hero-title">CASCADE</div>
+          <div class="btn-hero-sub">Solo contre l'IA ou en local — fais chuter ton score</div>
+        </div>
+        <span class="btn-hero-arrow">›</span>
+      </button>
     </main>
   </div>
 
@@ -238,6 +252,10 @@
   <script src="js/games/loups.js?v=20260630b"></script>
   <script src="js/games/undercover.js?v=20260630b"></script>
   <script src="js/games/changer.js?v=20260630b"></script>
+  <!-- Cascade (jeu hors ligne) : moteur pur → IA → contrôleur UI -->
+  <script src="js/games/skyjo/engine.js?v=20260701a"></script>
+  <script src="js/games/skyjo/ai.js?v=20260701a"></script>
+  <script src="js/games/skyjo/skyjo.js?v=20260701a"></script>
   <script src="js/qr-scanner.js?v=20260630b"></script>
   <script src="js/install-prompt.js?v=20260630b"></script>
   <script>
