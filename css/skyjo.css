@@ -390,6 +390,9 @@
 .cs-score-row .who small { display: block; color: var(--c-muted); font-weight: 400; font-size: 11px; }
 .cs-score-row .pts { font-family: 'Space Mono', monospace; font-weight: 700; font-size: 18px; }
 .cs-score-row .pts .rnd { color: var(--c-accent2); }
+.cs-score-row .pts .rnd.pos { color: #ffb648; }   /* gain (score qui monte) */
+.cs-score-row .pts .rnd.neg { color: #7ef7b0; }   /* négatif = bon dans Cascade */
+.cs-score-row .pts .rnd.zero { color: var(--c-muted); }
 .cs-badge-double {
   display: inline-block; font-size: 10px; font-weight: 800; padding: 2px 6px;
   border-radius: 6px; background: #ff5b6e; color: #fff; margin-left: 6px; vertical-align: middle;

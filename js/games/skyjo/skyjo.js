@@ -748,14 +748,21 @@
     const order = S.players.map((p, i) => ({ p, i }))
       .sort((a, b) => totals[a.i] - totals[b.i]);
     const medal = ['🥇', '🥈', '🥉'];
-    return order.map((x, rank) => `
+    return order.map((x, rank) => {
+      const rnd = scoresRound[x.i];
+      // Signe correct : « +9 » pour un gain, « -3 » pour un négatif (le moins
+      // est déjà dans le nombre), « 0 » sans signe. Évite le bug « +-3 ».
+      const rndTxt = rnd > 0 ? `+${rnd}` : `${rnd}`;
+      const rndCls = rnd < 0 ? 'neg' : rnd > 0 ? 'pos' : 'zero';
+      return `
       <div class="cs-score-row ${x.i === winner ? 'winner' : ''}">
         <div class="rank">${medal[rank] || (rank + 1)}</div>
         <div class="who">${AVATARS[x.i]} ${escapeHtml(x.p.name)}
           ${x.i === closer && doubled ? '<span class="cs-badge-double">×2</span>' : ''}
           <small>Total : ${totals[x.i]}</small></div>
-        <div class="pts"><span class="rnd">+${scoresRound[x.i]}</span></div>
-      </div>`).join('');
+        <div class="pts"><span class="rnd ${rndCls}">${rndTxt}</span></div>
+      </div>`;
+    }).join('');
   }
 
   function showRoundEnd() {
