@@ -53,6 +53,7 @@
   let setupPtr = 0;             // pointeur de siège pendant la phase setup
   let lastShownHuman = -1;      // dernier humain "présenté" (pass-and-play)
   const animatedReveals = new Set(); // clés de cartes déjà animées (flip)
+  const scoreCache = new Map();      // dernière valeur affichée par score (count-up)
   let dealtRound = 0;           // manche dont la distribution a été animée
   let aiTimer = null;           // timeout IA en cours (annulable au quit)
 
@@ -249,6 +250,7 @@
     cfg = { mode: config.mode, humans: config.humans, players: config.players };
     S = E.newGame(config.players);
     animatedReveals.clear();
+    scoreCache.clear();
     dealtRound = 0;
     setupPtr = 0;
     lastShownHuman = -1;
@@ -262,6 +264,7 @@
     S = save.S;
     cfg = { mode: save.mode, humans: new Set(save.humans), players: save.players };
     animatedReveals.clear();
+    scoreCache.clear();
     // Marque toutes les cartes déjà visibles comme "déjà animées" pour ne
     // pas rejouer un flip massif à la reprise.
     S.players.forEach((p, pi) => p.grid.forEach((c, ci) => {
@@ -395,7 +398,7 @@
         <div class="cs-opp-head">
           <span class="cs-opp-ava">${AVATARS[i]}</span>
           <span class="cs-opp-name">${escapeHtml(p.name)}</span>
-          <span class="cs-opp-score" title="Somme des cartes visibles">${E.gridScore(p.grid, true)}</span>
+          <span class="cs-opp-score cs-score-num" data-score-key="grid:${i}" data-score="${E.gridScore(p.grid, true)}" title="Somme des cartes visibles">${E.gridScore(p.grid, true)}</span>
         </div>
         ${miniGrid(p.grid)}
       </div>`).join('');
@@ -430,7 +433,16 @@
           <div class="cs-my-head">
             <span class="cs-my-ava">${AVATARS[me]}</span>
             <span class="cs-my-name">${escapeHtml(S.players[me].name)}</span>
-            <span class="cs-my-score">Grille : <b>${E.gridScore(S.players[me].grid, true)}</b> · Manches : ${S.players[me].totalScore}</span>
+            <div class="cs-hud">
+              <div class="cs-hud-stat cs-hud--grid">
+                <span class="cs-hud-label">Grille</span>
+                <span class="cs-hud-val cs-score-num" data-score-key="grid:${me}" data-score="${E.gridScore(S.players[me].grid, true)}">${E.gridScore(S.players[me].grid, true)}</span>
+              </div>
+              <div class="cs-hud-stat cs-hud--manches">
+                <span class="cs-hud-label">Manches</span>
+                <span class="cs-hud-val cs-score-num" data-score-key="manches:${me}" data-score="${S.players[me].totalScore}">${S.players[me].totalScore}</span>
+              </div>
+            </div>
           </div>
           <div class="cs-my-grid">${myGrid}</div>
         </div>
@@ -438,7 +450,43 @@
 
     bindBoard();
     // Effets déclenchés par les derniers événements du moteur.
-    requestAnimationFrame(() => applyEventEffects());
+    requestAnimationFrame(() => { applyEventEffects(); animateScores(); });
+  }
+
+  // ── Scores animés (count-up « façon jeu vidéo ») ────────────────────
+  // renderBoard reconstruit tout le DOM à chaque frame : on garde donc la
+  // dernière valeur affichée de chaque score dans `scoreCache` (clé stable
+  // par siège) pour animer la transition ancienne→nouvelle valeur.
+  function animateScores() {
+    if (!el) return;
+    el.querySelectorAll('.cs-score-num[data-score-key]').forEach((node) => {
+      const key = node.dataset.scoreKey;
+      const target = parseInt(node.dataset.score, 10) || 0;
+      const prev = scoreCache.has(key) ? scoreCache.get(key) : target;
+      scoreCache.set(key, target);
+      if (!settings.anim || prev === target) { node.textContent = target; return; }
+      tweenNumber(node, prev, target, 460);
+    });
+  }
+
+  // Compte progressivement de `from` à `to` avec un « pop » (scale + glow).
+  function tweenNumber(node, from, to, dur) {
+    node.classList.remove('score-up', 'score-down');
+    void node.offsetWidth;                     // reflow → relance l'animation
+    node.classList.add(to > from ? 'score-up' : 'score-down');
+    const start = performance.now();
+    const diff = to - from;
+    node.textContent = from;
+    (function frame(now) {
+      const t = Math.min(1, (now - start) / dur);
+      const eased = 1 - Math.pow(1 - t, 3);    // easeOutCubic
+      node.textContent = Math.round(from + diff * eased);
+      if (t < 1) requestAnimationFrame(frame);
+      else {
+        node.textContent = to;
+        setTimeout(() => node.classList.remove('score-up', 'score-down'), 380);
+      }
+    })(start);
   }
 
   function bannerText() {
@@ -727,6 +775,7 @@
       back.remove();
       E.startNextRound(S);
       animatedReveals.clear();
+      scoreCache.clear();
       lastShownHuman = -1;
       saveGame();
       runSeat();

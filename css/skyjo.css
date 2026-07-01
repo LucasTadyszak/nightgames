@@ -157,9 +157,9 @@
 .cs-opp-head .cs-opp-ava { font-size: 16px; }
 .cs-opp-head .cs-opp-name { font-size: 12px; font-weight: 700; max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cs-opp-head .cs-opp-score { margin-left: auto; font-family: 'Space Mono', monospace; font-size: 12px; color: var(--c-accent2); }
-.cs-mini-grid { display: grid; grid-template-columns: repeat(4, 22px); grid-auto-rows: 30px; gap: 4px; }
+.cs-mini-grid { display: grid; grid-template-columns: repeat(4, 18px); grid-auto-rows: 24px; gap: 3px; }
 .cs-mini-cell {
-  border-radius: 5px; font-size: 12px; font-weight: 700;
+  border-radius: 5px; font-size: 11px; font-weight: 700;
   display: flex; align-items: center; justify-content: center;
   background: var(--c-surface2); color: var(--c-text);
   border: 1px solid var(--c-border);
@@ -170,7 +170,7 @@
    globale (display:none !important) dans style.css. */
 .cs-mini-cell.covered {
   background: linear-gradient(135deg, var(--c-accent), var(--c-accent2));
-  opacity: 1; font-size: 12px; border-color: rgba(255, 255, 255, .18);
+  opacity: 1; font-size: 11px; border-color: rgba(255, 255, 255, .18);
 }
 /* Emplacement d'une colonne retirée : cadre vide (pas de carte). */
 .cs-mini-cell.removed { opacity: 0; border-color: transparent; }
@@ -198,6 +198,47 @@
 .cs-my-head .cs-my-ava { font-size: 22px; }
 .cs-my-head .cs-my-name { font-weight: 800; font-size: 16px; }
 .cs-my-head .cs-my-score { margin-left: auto; font-family: 'Space Mono', monospace; color: var(--c-accent2); font-weight: 700; }
+
+/* ── HUD des scores (façon jeu vidéo) ───────────────────────────────── */
+.cs-hud { margin-left: auto; display: flex; gap: 8px; }
+.cs-hud-stat {
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  min-width: 58px; padding: 3px 10px 4px; border-radius: 10px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, .015));
+  border: 1px solid var(--c-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .10), 0 4px 14px -8px rgba(0, 0, 0, .5);
+}
+.cs-hud-label {
+  font-size: 8px; font-weight: 800; letter-spacing: 1.4px; text-transform: uppercase;
+  color: var(--c-muted);
+}
+.cs-hud-val {
+  font-family: 'Space Mono', monospace; font-weight: 700; font-size: 18px; line-height: 1;
+}
+.cs-hud--grid .cs-hud-val {
+  color: var(--c-accent2);
+  text-shadow: 0 0 12px color-mix(in srgb, var(--c-accent2) 60%, transparent);
+}
+.cs-hud--manches .cs-hud-val {
+  color: var(--c-accent);
+  text-shadow: 0 0 12px color-mix(in srgb, var(--c-accent) 60%, transparent);
+}
+
+/* Nombre animé : count-up + « pop » (scale + glow) à chaque variation. */
+.cs-score-num { display: inline-block; transform-origin: center; }
+@keyframes cs-pop-up {
+  0%   { transform: scale(1); }
+  22%  { transform: scale(1.55); filter: drop-shadow(0 0 14px #ffb648); }
+  100% { transform: scale(1); filter: none; }
+}
+@keyframes cs-pop-down {
+  0%   { transform: scale(1); }
+  22%  { transform: scale(1.45); filter: drop-shadow(0 0 14px #7ef7b0); }
+  100% { transform: scale(1); filter: none; }
+}
+[data-cascade-anim="on"] .cs-score-num.score-up   { animation: cs-pop-up .46s cubic-bezier(.2, 1.5, .3, 1); }
+[data-cascade-anim="on"] .cs-score-num.score-down { animation: cs-pop-down .46s cubic-bezier(.2, 1.5, .3, 1); }
+
 .cs-my-grid {
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
   max-width: 360px; margin: 0 auto;
