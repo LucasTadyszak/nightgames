@@ -108,6 +108,9 @@ function initLobby() {
 
   document.getElementById('btn-create-lobby').onclick = () => startCreateFlow();
   document.getElementById('btn-join-lobby').onclick   = () => startJoinFlow();
+  // Cascade : jeu hors ligne, indépendant du lobby Supabase.
+  const cascadeBtn = document.getElementById('btn-play-cascade');
+  if (cascadeBtn) cascadeBtn.onclick = () => window.Cascade && window.Cascade.launch();
   document.getElementById('btn-toggle-code-input').onclick = () => {
     const collapse = document.getElementById('join-code-collapse');
     const isOpen = collapse.classList.toggle('open');

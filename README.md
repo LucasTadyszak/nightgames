@@ -16,6 +16,7 @@ Chaque joueur rejoint via un **code de salle** (comme Kahoot), sur son propre t�
 | 🐺 Loups Garous | 6–16 | Village vs loups-garous |
 | 🕵️ Undercover Ultime | 3–20 | Mot secret, descriptions et votes d'élimination — démasque les infiltrés |
 | 🎲 Game Changer | 2–8 | Les règles changent à chaque manche |
+| 🎴 Cascade | 1–6 | Jeu de cartes **hors ligne** : solo vs IA ou local, fais chuter ton score |
 
 ---
 
@@ -98,6 +99,47 @@ nightgames/
 │       ├── loups.js
 │       └── changer.js
 └── supabase_schema.sql     # SQL à coller dans Supabase
+```
+
+---
+
+## 🎴 Cascade (jeu hors ligne)
+
+**Cascade** est un jeu de cartes intégré, **100 % hors ligne** (aucune salle
+Supabase requise). Il se lance depuis l'écran d'accueil (bouton *Cascade*) et
+tourne dans son propre overlay plein écran.
+
+- **Solo contre l'IA** — 1 à 5 adversaires, 3 niveaux (Facile / Moyen / Difficile).
+- **Multijoueur local** — jusqu'à 6 joueurs qui se passent l'appareil.
+- **Sauvegarde automatique** (reprise de partie), **statistiques**, **réglages**
+  (sons, animations, thème clair/sombre, vitesse de l'IA).
+- Animations premium : distribution, retournement 3D, effet de pression,
+  particules à la suppression d'une colonne, comptage de score, transitions de
+  tour, vibration haptique.
+
+> Cascade reprend des **mécaniques classiques** de jeu de cartes (grille 3×4,
+> pioche/défausse, colonnes identiques supprimées, plus bas score gagnant) avec
+> un **nom, des visuels et une identité entièrement originaux**.
+
+### Architecture (moteur / IA / UI séparés)
+
+```
+js/games/skyjo/
+├── engine.js        # Moteur PUR (aucun DOM) : règles, deck, colonnes, scores
+├── ai.js            # IA stratégique (easy / medium / hard), n'utilise que l'API du moteur
+├── skyjo.js         # Contrôleur UI + expérience (rendu, animations, persistance)
+└── engine.test.js   # Tests unitaires du moteur (Node, sans dépendance)
+css/skyjo.css        # Habillage + animations (scopé sous .cascade-app)
+```
+
+Le moteur étant indépendant de l'UI et sérialisable (état JSON, aléa
+injectable), il est directement testable **et** prêt pour un futur mode en
+ligne (il suffirait de synchroniser l'état via la couche Supabase existante).
+
+### Lancer les tests
+
+```bash
+node js/games/skyjo/engine.test.js
 ```
 
 ---
