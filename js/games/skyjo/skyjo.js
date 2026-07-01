@@ -370,10 +370,12 @@
   }
 
   function miniGrid(grid) {
+    // On révèle TOUTES les cartes des adversaires (les cartes réellement
+    // face cachée sont marquées ".peek" pour rester visuellement distinctes).
     return `<div class="cs-mini-grid">${grid.map((c) => {
       if (c.removed) return `<div class="cs-mini-cell removed"></div>`;
-      if (!c.faceUp) return `<div class="cs-mini-cell hidden"></div>`;
-      return `<div class="cs-mini-cell ${valueClass(c.value)}">${c.value}</div>`;
+      const peek = c.faceUp ? '' : ' peek';
+      return `<div class="cs-mini-cell ${valueClass(c.value)}${peek}">${c.value}</div>`;
     }).join('')}</div>`;
   }
 
@@ -391,7 +393,7 @@
         <div class="cs-opp-head">
           <span class="cs-opp-ava">${AVATARS[i]}</span>
           <span class="cs-opp-name">${escapeHtml(p.name)}</span>
-          <span class="cs-opp-score">${p.totalScore}</span>
+          <span class="cs-opp-score" title="Somme de la grille">${E.gridScore(p.grid)}</span>
         </div>
         ${miniGrid(p.grid)}
       </div>`).join('');

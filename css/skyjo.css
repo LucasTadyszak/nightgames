@@ -164,6 +164,9 @@
   background: var(--c-surface2); color: var(--c-text);
 }
 .cs-mini-cell.hidden { background: var(--c-accent); opacity: .5; }
+/* Carte encore face cachée pour l'adversaire, mais révélée en avance :
+   valeur affichée en semi-transparence avec un liseré pointillé. */
+.cs-mini-cell.peek { opacity: .55; outline: 1px dashed rgba(255,255,255,.35); outline-offset: -1px; }
 .cs-mini-cell.removed { opacity: 0; }
 
 /* Zone centrale : pioche + défausse */
