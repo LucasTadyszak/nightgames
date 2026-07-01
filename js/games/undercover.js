@@ -128,6 +128,44 @@ function _ucMimeId(s) {
   return order[s.round % order.length];
 }
 
+// Liste lisible des joueurs de `pool` qui n'ont pas encore agi (vote…).
+function _ucPending(pool, doneMap) {
+  return pool.filter(p => !doneMap[p.id]).map(p => `${p.avatar} ${p.name}`).join(', ');
+}
+
+// ── Bandeau "mon mot secret" avec bouton cacher/afficher ─────────────────
+// La visibilité est une préférence purement LOCALE (jamais synchronisée :
+// le mot reste confidentiel). On la garde dans une variable de module pour
+// qu'elle survive aux re-rendus déclenchés par les mises à jour Realtime.
+let _ucWordVisible = false;
+const _UC_MASK = '• • • • • •';
+
+function _ucWordBanner(word) {
+  const isWhite = !word;
+  const val = isWhite ? 'MR. WHITE — aucun mot' : (_ucWordVisible ? word.toUpperCase() : _UC_MASK);
+  return `
+    <div class="challenge-card" style="--card-color:#00d4aa;display:flex;align-items:center;gap:12px;text-align:left">
+      <div style="flex:1;min-width:0">
+        <div class="challenge-type">🤫 TON MOT SECRET</div>
+        <div id="uc-word-val" style="font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:2px;${isWhite ? 'opacity:.85;font-size:18px' : ''}">${val}</div>
+      </div>
+      ${isWhite ? '' : `<button id="uc-word-toggle" class="btn-secondary" style="margin:0;width:auto;padding:10px 16px;white-space:nowrap" onclick="ucToggleWord()">${_ucWordVisible ? '🙈' : '👁️'}</button>`}
+    </div>`;
+}
+
+// Branche le bouton de bascule sur un toggle LOCAL (pas d'onStateChange),
+// en mettant à jour le DOM en place pour ne pas re-render toute la vue.
+function _ucBindWordToggle(word) {
+  if (!word) { window.ucToggleWord = () => {}; return; }
+  window.ucToggleWord = () => {
+    _ucWordVisible = !_ucWordVisible;
+    const el = document.getElementById('uc-word-val');
+    const btn = document.getElementById('uc-word-toggle');
+    if (el) el.textContent = _ucWordVisible ? word.toUpperCase() : _UC_MASK;
+    if (btn) btn.textContent = _ucWordVisible ? '🙈' : '👁️';
+  };
+}
+
 GameEngines['undercover'] = {
 
   // initState ne fait que poser l'écran de configuration : c'est le host
@@ -136,7 +174,7 @@ GameEngines['undercover'] = {
   initState(players) {
     const n = players.length;
     return {
-      phase: 'setup',                 // setup | reveal | describe | vote | mrwhite_guess | end
+      phase: 'setup',                 // setup | reveal | describe | vote | deesse_pick | mrwhite_guess | vengeur_pick | end
       config: {
         undercover: 1,
         mrwhite: n >= 4,
@@ -294,98 +332,158 @@ GameEngines['undercover'] = {
       }
 
       // ══════════════════════════ DESCRIBE ═══════════════════════════
+      // « Patate chaude » : chacun son tour décrit son mot (ou le mime),
+      // puis passe au joueur suivant depuis SON propre téléphone. Quand le
+      // dernier a parlé, on bascule automatiquement vers le vote.
       if (s.phase === 'describe') {
-        const alive = players.filter(p => s.alive.includes(p.id));
         const order = s.descOrder.filter(id => s.alive.includes(id));
+        const pos = s.descPos || 0;
+        const currentId = order[pos];
+        const amCurrent = myId === currentId;
         const mimeId = _ucMimeId(s);
+        const myWord = s.words[myId];
+        const isLast = pos + 1 >= order.length;
 
         root.innerHTML = `
-          <div class="game-header"><div class="game-title">🕵️ Tour ${s.round + 1} — Descriptions</div></div>
+          <div class="game-header"><div class="game-title">🗣️ Tour ${s.round + 1} — Descriptions</div></div>
           <div class="game-body slide-up">
-            <div class="challenge-card" style="--card-color:#7c3aed">
-              <div class="challenge-type">🗣️ À TOUR DE RÔLE</div>
-              <div class="challenge-text">Chacun donne <strong>un mot</strong> qui décrit son mot secret — sans jamais le révéler !</div>
+            ${_ucWordBanner(myWord)}
+            <div class="turn-banner">
+              <div class="turn-banner-label">${amCurrent ? "🥔 C'EST TON TOUR" : 'AU TOUR DE'}</div>
+              <div class="turn-banner-name">${_ucName(players, currentId)}</div>
             </div>
-            ${mimeId ? `<div class="challenge-card" style="--card-color:#ff9500">
-              <div class="challenge-type">🤹 MR. MEME</div>
-              <div class="challenge-text"><strong>${_ucName(players, mimeId)}</strong> doit décrire son mot uniquement par des gestes ce tour-ci !</div>
-            </div>` : ''}
-            <div class="section-label">ORDRE DE PAROLE</div>
-            <div style="display:flex;flex-direction:column;gap:8px">
-              ${order.map((id, i) => `
-                <div class="wolf-player-row" style="cursor:default;${id === mimeId ? 'border-color:#ff9500' : ''}">
+            ${currentId === mimeId
+              ? `<div class="challenge-card" style="--card-color:#ff9500">
+                  <div class="challenge-type">🤹 MR. MEME</div>
+                  <div class="challenge-text">${amCurrent ? 'À toi : décris ton mot <strong>uniquement par des gestes</strong>, sans parler !' : `<strong>${_ucName(players, currentId)}</strong> doit <strong>mimer</strong> son mot ce tour-ci.`}</div>
+                </div>`
+              : `<div class="challenge-card" style="--card-color:#7c3aed">
+                  <div class="challenge-type">🗣️ DESCRIPTION</div>
+                  <div class="challenge-text">${amCurrent ? 'Donne <strong>un indice</strong> sur ton mot, sans jamais le dire !' : 'Écoute l\'indice et aiguise tes soupçons…'}</div>
+                </div>`}
+            <div class="section-label">PASSAGES (${pos}/${order.length})</div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              ${order.map((id, i) => {
+                const done = i < pos, isCur = i === pos;
+                return `<div class="wolf-player-row" style="cursor:default;${isCur ? 'border-color:#ff9500;' : ''}${done ? 'opacity:.45' : ''}">
                   <span style="opacity:.5;font-weight:700;width:20px">${i + 1}</span>
-                  <span style="font-size:22px">${players.find(p => p.id === id)?.avatar}</span>
+                  <span style="font-size:20px">${players.find(p => p.id === id)?.avatar}</span>
                   <span style="flex:1;text-align:left;font-weight:700">${players.find(p => p.id === id)?.name}</span>
                   ${id === mimeId ? '<span>🤹</span>' : ''}
-                </div>`).join('')}
+                  ${done ? '<span>✅</span>' : isCur ? '<span>🥔</span>' : ''}
+                </div>`;
+              }).join('')}
             </div>
-            ${s.modes.fantome ? `<div style="font-size:12px;color:var(--muted);text-align:center">👻 Mode Fantôme : les éliminés participent toujours aux votes.</div>` : ''}
-            ${isHost
-              ? `<button class="btn-primary" style="--g1:#ff3d6b;--g2:#ff9500" onclick="ucToVote()">🗳️ PASSER AU VOTE →</button>`
-              : `<div class="guest-waiting"><div class="pulse-dot"></div>Décrivez, débattez… puis le host lance le vote.</div>`}
+            ${amCurrent
+              ? `<button class="btn-primary" style="--g1:#ff3d6b;--g2:#ff9500" onclick="ucNextSpeaker()">${isLast ? '🗳️ TERMINÉ — AU VOTE' : 'JOUEUR SUIVANT ➡️'}</button>`
+              : `<div class="guest-waiting"><div class="pulse-dot"></div>${_ucName(players, currentId)} décrit son mot…</div>`}
+            ${isHost && !amCurrent ? `<button class="btn-secondary" onclick="ucSkipSpeaker()">Passer ${_ucName(players, currentId)} (absent)</button>` : ''}
           </div>`;
-        if (isHost) window.ucToVote = () => { const ns = { ...s, phase:'vote', pending:null }; onStateChange(ns); render(ns); };
+        _ucBindWordToggle(myWord);
+
+        const advance = () => {
+          const next = pos + 1;
+          const ns = next >= order.length ? _ucEnterVote(s) : { ...s, descPos: next };
+          onStateChange(ns); render(ns);
+        };
+        if (amCurrent) window.ucNextSpeaker = advance;
+        if (isHost)    window.ucSkipSpeaker = advance;   // garde-fou si un joueur ne répond pas
         return;
       }
 
       // ════════════════════════════ VOTE ═════════════════════════════
+      // Vote confidentiel : chacun vote sur SON portable. L'écran montre
+      // les joueurs en jeu (votables) et les éliminés. Avec le mode
+      // Fantôme, les éliminés votent aussi. Le dépouillement applique les
+      // pouvoirs liés aux rôles (Boomerang qui renvoie les votes, Déesse
+      // qui tranche les égalités).
       if (s.phase === 'vote') {
-        const alive = players.filter(p => s.alive.includes(p.id));
-        const deesseAlive = s.deesseId; // garde le pouvoir même éliminée
-        // pending : { killedNames, role, then } — petit récap après élimination
-
-        if (!isHost) {
-          root.innerHTML = `
-            <div class="game-header"><div class="game-title">🗳️ Vote — Tour ${s.round + 1}</div></div>
-            <div class="game-body slide-up">
-              <div class="challenge-card" style="--card-color:#ff3d6b">
-                <div class="challenge-type">🗳️ VOTE À MAIN LEVÉE</div>
-                <div class="challenge-text">Désignez ensemble le joueur le plus suspect. Le host enregistre l'élimination.</div>
-              </div>
-              ${deesseAlive ? `<div style="font-size:12px;color:var(--muted);text-align:center">⚖️ En cas d'égalité, la Déesse de la Justice tranche.</div>` : ''}
-              <div class="guest-waiting"><div class="pulse-dot"></div>En attente de l'élimination…</div>
-            </div>`;
-          return;
-        }
+        const aliveP = players.filter(p => s.alive.includes(p.id));
+        const deadP  = players.filter(p => !s.alive.includes(p.id));
+        const voters = s.modes.fantome ? players : aliveP;
+        const iAmVoter = voters.some(p => p.id === myId);
+        const votes = s.votes || {};
+        const myVote = votes[myId];
+        const votedCount = Object.keys(votes).length;
+        const pending = _ucPending(voters, votes);
+        const myWord = s.words[myId];
 
         root.innerHTML = `
           <div class="game-header"><div class="game-title">🗳️ Vote — Tour ${s.round + 1}</div></div>
           <div class="game-body slide-up">
+            ${_ucWordBanner(myWord)}
             <div class="challenge-card" style="--card-color:#ff3d6b">
-              <div class="challenge-type">🗳️ QUI EST ÉLIMINÉ ?</div>
-              <div class="challenge-text">Touchez le joueur désigné par le vote.${s.deesseId ? ' En cas d\'égalité, ⚖️ la Déesse tranche.' : ''}</div>
+              <div class="challenge-type">🗳️ VOTE CONFIDENTIEL</div>
+              <div class="challenge-text">${iAmVoter ? 'Vote en <strong>secret</strong> pour le joueur à éliminer.' : 'Tu es éliminé : tu ne peux pas voter ce tour.'}${s.deesseId ? ' ⚖️ En cas d\'égalité, la Déesse tranche.' : ''}</div>
             </div>
+            <div class="section-label">🟢 EN JEU${iAmVoter && !myVote ? ' — TOUCHE POUR VOTER' : ''}</div>
             <div style="display:flex;flex-direction:column;gap:8px">
-              ${alive.map(p => `
-                <button class="wolf-player-row" onclick="ucEliminate('${p.id}')">
-                  <span style="font-size:22px">${p.avatar}</span>
-                  <span style="flex:1;text-align:left;font-weight:700">${p.name}</span>
-                  ${s.boomerangId === p.id && !s.boomerangUsed ? '<span title="Boomerang">🪃</span>' : ''}
-                </button>`).join('')}
+              ${aliveP.map(p => {
+                const votable = iAmVoter && !myVote;
+                const tag = myVote === p.id ? '<span>🗳️ ton vote</span>' : (p.id === myId ? '<span style="opacity:.5;font-size:12px">toi</span>' : '');
+                return votable
+                  ? `<button class="wolf-player-row" onclick="ucVote('${p.id}')"><span style="font-size:22px">${p.avatar}</span><span style="flex:1;text-align:left;font-weight:700">${p.name}${p.id === myId ? ' (toi)' : ''}</span></button>`
+                  : `<div class="wolf-player-row" style="cursor:default"><span style="font-size:20px">${p.avatar}</span><span style="flex:1;text-align:left;font-weight:700">${p.name}</span>${tag}</div>`;
+              }).join('')}
             </div>
-            <button class="btn-secondary" onclick="ucSkipVote()">Pas d'élimination ce tour</button>
+            ${deadP.length ? `
+              <div class="section-label" style="margin-top:6px">☠️ ÉLIMINÉS</div>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                ${deadP.map(p => `<div class="wolf-player-row eliminated" style="cursor:default"><span style="font-size:20px">${p.avatar}</span><span style="flex:1;text-align:left;font-weight:700">${p.name}</span>${s.modes.fantome ? '<span>👻 vote</span>' : ''}</div>`).join('')}
+              </div>` : ''}
+            <div class="guest-waiting"><div class="pulse-dot"></div>Votes : ${votedCount}/${voters.length}${pending ? `<br><span style="font-size:12px">⏳ ${pending}</span>` : ''}</div>
+            ${isHost && votedCount < voters.length ? `<button class="btn-secondary" onclick="ucForceTally()">Dépouiller maintenant — manque ${pending}</button>` : ''}
           </div>`;
+        _ucBindWordToggle(myWord);
 
-        window.ucSkipVote = () => { const ns = _ucEnterDescribe(s, s.round + 1); onStateChange(ns); render(ns); };
-        window.ucEliminate = (pid) => {
-          // Boomerang : la 1ʳᵉ fois, le vote rebondit — personne n'est éliminé.
-          if (pid === s.boomerangId && !s.boomerangUsed) {
-            showToast('🪃 Boomerang ! Le vote rebondit, personne n\'est éliminé.', 3500);
-            const ns = _ucEnterDescribe({ ...s, boomerangUsed:true }, s.round + 1);
-            setTimeout(() => { onStateChange(ns); render(ns); }, 1800);
-            return;
-          }
-          const role = s.roles[pid];
-          // Mr. White éliminé : il peut tenter de deviner le mot des Civils.
-          if (role === 'mrwhite') {
-            const ns = { ...s, phase:'mrwhite_guess', whiteId:pid };
-            showToast(`${_ucName(players, pid)} était 🃏 Mr. White !`, 2600);
-            setTimeout(() => { onStateChange(ns); render(ns); }, 800);
-            return;
-          }
-          _ucApplyElimination(s, [pid], { byVote:true, players, onStateChange, render });
-        };
+        if (iAmVoter && !myVote) {
+          window.ucVote = (pid) => {
+            const nv = { ...votes, [myId]: pid };
+            const ns = { ...s, votes: nv };
+            if (Object.keys(nv).length >= voters.length) {
+              // Dernier votant : on persiste le décompte complet puis on dépouille.
+              onStateChange(ns); render(ns);
+              _ucResolveVotes(ns, players, { onStateChange, render });
+            } else {
+              onStateChange(ns); render(ns);
+            }
+          };
+        }
+        if (isHost) window.ucForceTally = () => _ucResolveVotes(s, players, { onStateChange, render });
+        return;
+      }
+
+      // ═══════════════════════ DÉESSE — ÉGALITÉ ══════════════════════
+      // En cas d'égalité, la Déesse de la Justice tranche (même éliminée,
+      // elle garde son pouvoir).
+      if (s.phase === 'deesse_pick') {
+        const amDeesse = myId === s.deesseId;
+        const tied = (s.tied || []).map(id => players.find(p => p.id === id)).filter(Boolean);
+        root.innerHTML = `
+          <div class="game-header"><div class="game-title">⚖️ La Déesse de la Justice</div></div>
+          <div class="game-body slide-up">
+            <div class="challenge-card" style="--card-color:#7c3aed">
+              <div class="challenge-type">⚖️ ÉGALITÉ DES VOTES</div>
+              <div class="challenge-text">${amDeesse ? 'Rends la justice : choisis qui est éliminé parmi les ex-æquo.' : `${_ucName(players, s.deesseId)} (la Déesse) tranche l'égalité…`}</div>
+            </div>
+            ${amDeesse ? `
+              <div style="display:flex;flex-direction:column;gap:8px">
+                ${tied.map(p => `<button class="wolf-player-row" onclick="ucDeesse('${p.id}')"><span style="font-size:22px">${p.avatar}</span><span style="flex:1;text-align:left;font-weight:700">${p.name}</span></button>`).join('')}
+              </div>
+              <button class="btn-secondary" onclick="ucDeesseSkip()">Gracier tout le monde (aucune élimination)</button>
+            ` : `<div class="guest-waiting"><div class="pulse-dot"></div>La Déesse délibère…</div>`}
+          </div>`;
+        if (amDeesse) {
+          window.ucDeesse = (pid) => {
+            if (s.roles[pid] === 'mrwhite') {
+              showToast(`${_ucName(players, pid)} était 🃏 Mr. White !`, 2600);
+              setTimeout(() => { const ns = { ...s, phase:'mrwhite_guess', whiteId:pid }; onStateChange(ns); render(ns); }, 800);
+              return;
+            }
+            _ucApplyElimination({ ...s, phase:'vote' }, [pid], { byVote:true, players, onStateChange, render });
+          };
+          window.ucDeesseSkip = () => { const ns = _ucEnterDescribe(s, s.round + 1); onStateChange(ns); render(ns); };
+        }
         return;
       }
 
@@ -580,9 +678,71 @@ function _ucDeal(players, cfg, baseScores) {
   };
 }
 
-// Entre dans la phase de description du tour `round` (recalcule l'ordre).
+// Entre dans la phase de description du tour `round` : on remet le curseur
+// de la « patate chaude » à zéro et on vide les votes du tour précédent.
 function _ucEnterDescribe(s, round) {
-  return { ...s, phase: 'describe', round };
+  return { ...s, phase: 'describe', round, descPos: 0, votes: {} };
+}
+
+// Entre dans la phase de vote confidentiel (urne vide).
+function _ucEnterVote(s) {
+  return { ...s, phase: 'vote', votes: {} };
+}
+
+// Dépouille le vote confidentiel et enchaîne sur la phase adéquate.
+// Pousse l'état lui-même (comme _ucApplyElimination).
+function _ucResolveVotes(s, players, ctx) {
+  const { onStateChange, render } = ctx;
+  const votes = s.votes || {};
+
+  const proceed = (s2) => {
+    // Décompte des cibles.
+    const tally = {};
+    Object.values(s2.votes || {}).forEach(t => { tally[t] = (tally[t] || 0) + 1; });
+
+    let max = 0;
+    Object.values(tally).forEach(c => { if (c > max) max = c; });
+    const top = Object.keys(tally).filter(id => tally[id] === max && max > 0);
+
+    // Personne n'a voté → on relance un tour de description.
+    if (top.length === 0) {
+      const ns = _ucEnterDescribe(s2, s2.round + 1);
+      onStateChange(ns); render(ns); return;
+    }
+    // Égalité : la Déesse tranche, sinon personne n'est éliminé.
+    if (top.length > 1) {
+      if (s2.deesseId) {
+        const ns = { ...s2, phase: 'deesse_pick', tied: top };
+        onStateChange(ns); render(ns); return;
+      }
+      showToast('🤝 Égalité — personne n\'est éliminé ce tour.', 3000);
+      const ns = _ucEnterDescribe(s2, s2.round + 1);
+      setTimeout(() => { onStateChange(ns); render(ns); }, 1400);
+      return;
+    }
+    // Gagnant unique du vote.
+    const elimId = top[0];
+    if (s2.roles[elimId] === 'mrwhite') {
+      showToast(`${_ucName(players, elimId)} était 🃏 Mr. White !`, 2600);
+      setTimeout(() => { const ns = { ...s2, phase: 'mrwhite_guess', whiteId: elimId }; onStateChange(ns); render(ns); }, 800);
+      return;
+    }
+    _ucApplyElimination(s2, [elimId], { byVote: true, players, onStateChange, render });
+  };
+
+  // Boomerang : la 1ʳᵉ fois qu'il reçoit des votes, ils rebondissent sur
+  // leurs auteurs (chaque votant prend un vote « contre lui »).
+  if (s.boomerangId && !s.boomerangUsed && Object.values(votes).includes(s.boomerangId)) {
+    const reflected = { ...votes };
+    Object.entries(votes).forEach(([voter, target]) => {
+      if (target === s.boomerangId) reflected[voter] = voter; // le vote revient au votant
+    });
+    const s2 = { ...s, votes: reflected, boomerangUsed: true };
+    showToast('🪃 Boomerang ! Les votes contre lui rebondissent sur leurs auteurs.', 3200);
+    setTimeout(() => proceed(s2), 1700);
+    return;
+  }
+  proceed(s);
 }
 
 // Applique une élimination (vote, vengeance, amoureux…), gère les chaînes
