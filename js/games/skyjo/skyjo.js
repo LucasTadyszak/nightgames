@@ -461,9 +461,15 @@
   // Zone centrale : pioche, défausse et carte en main éventuelle.
   function renderCenter() {
     const top = E.topDiscard(S);
+    // La défausse peut être momentanément vide (ex. juste après avoir pris sa
+    // dernière carte). On affiche alors un emplacement "interdit" plutôt que
+    // du texte (une valeur `undefined` était parfois auto-traduite en
+    // « À définir » par le navigateur).
+    const discardEmpty = top === undefined || top === null;
     const drawCell = { value: 0, faceUp: false, removed: false };
     const discCell = { value: top, faceUp: true, removed: false };
     const canPickSource = isMyTurnNow() && S.phase === 'turn';
+    const canPickDiscard = canPickSource && !discardEmpty;
 
     const drawnHTML = (S.phase === 'drawn')
       ? `<div class="cs-pile-wrap"><div class="cs-drawn">${cardHTML({ value: S.drawnCard, faceUp: true, removed: false }, `drawn:${S.drawnCard}:${Date.now()}`, {})}</div>
@@ -480,8 +486,10 @@
       </div>
       ${drawnHTML}
       <div class="cs-pile-wrap">
-        <div class="cs-drawn ${canPickSource ? 'selectable-src' : ''}" data-src="discard">
-          ${cardHTML(discCell, `pile-disc:${top}`, { selectable: canPickSource })}
+        <div class="cs-drawn ${canPickDiscard ? 'selectable-src' : ''}" data-src="discard">
+          ${discardEmpty
+            ? `<div class="cs-card cs-empty" aria-label="Défausse vide">🚫</div>`
+            : cardHTML(discCell, `pile-disc:${top}`, { selectable: canPickDiscard })}
         </div>
         <div class="cs-pile-label">Défausse</div>
       </div>

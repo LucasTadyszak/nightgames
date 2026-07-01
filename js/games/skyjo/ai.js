@@ -76,6 +76,34 @@
     return best !== null ? { index: best, bonus: bestBonus } : null;
   }
 
+  // ── Conscience de la règle du DOUBLEMENT ────────────────────────────
+  // Celui qui termine la manche voit son score DOUBLÉ s'il n'a pas le score
+  // strictement le plus bas. Les IA moyenne/difficile évitent donc de
+  // terminer la manche tant qu'elles ne sont pas sûres d'être en tête, et
+  // terminent volontiers quand c'est le cas.
+
+  const faceUpSum = (grid) =>
+    grid.reduce((s, c) => (!c.removed && c.faceUp ? s + c.value : s), 0);
+
+  // Estimation du score final d'un joueur : cartes visibles + espérance des
+  // cartes encore cachées.
+  function estimateScore(grid) {
+    return faceUpSum(grid) + E.hiddenIndices(grid).length * AVG_HIDDEN;
+  }
+
+  // Terminer maintenant (avec `myProjected` comme score final estimé) est-il
+  // "sûr" ? Il faut être nettement sous le meilleur adversaire estimé pour
+  // ne pas risquer le doublement. La marge dépend du niveau.
+  function finishingIsSafe(state, playerIndex, myProjected, level) {
+    const margin = level === 'hard' ? 1 : 4; // difficile ose davantage
+    let minOpp = Infinity;
+    state.players.forEach((p, i) => {
+      if (i === playerIndex) return;
+      minOpp = Math.min(minOpp, estimateScore(p.grid));
+    });
+    return myProjected < minOpp - margin;
+  }
+
   // ── Choix des révélations de départ ─────────────────────────────────
   // On révèle des cartes de coins/positions variées : peu importe la
   // valeur (inconnue), on évite juste de tout révéler sur une même colonne
@@ -129,6 +157,51 @@
 
     const opp = columnOpportunity(grid, card);
     const repl = bestFaceUpReplacement(grid, card);
+
+    // ── Gestion du DOUBLEMENT (moyen / difficile) ─────────────────────
+    // Si une seule carte reste cachée, la révéler (ou poser dessus) TERMINE
+    // la manche. On ne le fait que si on est sûr d'avoir le score le plus
+    // bas (sinon notre score serait doublé). Sinon on temporise en posant
+    // sur une carte VISIBLE (ce qui ne termine pas la manche).
+    if (level !== 'easy') {
+      const hidden = E.hiddenIndices(grid);
+      if (hidden.length !== 1) {
+        // Hors situation de fin : on remet à zéro le budget de temporisation.
+        p._stall = 0;
+      } else {
+        const lastHidden = hidden[0];
+        const projectedIfFinish = faceUpSum(grid) + card; // score si on pose sur la dernière cachée
+        if (finishingIsSafe(state, state.currentPlayer, projectedIfFinish, level)) {
+          // On est en tête : on termine la manche en verrouillant ce score.
+          p._stall = 0;
+          return { action: 'replace', index: lastHidden };
+        }
+        // Pas sûr d'être le plus bas → on TEMPORISE : poser sur une carte
+        // VISIBLE (jamais la dernière cachée, jamais défausser) pour ne PAS
+        // terminer la manche. On laisse ainsi le plus souvent un adversaire
+        // devenir celui qui clôt (et subir le doublement à notre place).
+        //
+        // Budget de patience borné (cap) → garantit que la manche finit
+        // toujours par se terminer (pas de blocage si tout le monde attend).
+        const cap = level === 'hard' ? 4 : 2;
+        if ((p._stall || 0) < cap) {
+          p._stall = (p._stall || 0) + 1;
+          // De préférence un remplacement qui baisse le score ; sinon la plus
+          // grosse carte visible (dégât minimal), sans toucher la cachée.
+          if (repl && repl.gain > 0) return { action: 'replace', index: repl.index };
+          const faceUps = grid
+            .map((c, i) => ({ c, i }))
+            .filter((x) => !x.c.removed && x.c.faceUp);
+          if (faceUps.length) {
+            faceUps.sort((a, b) => b.c.value - a.c.value);
+            return { action: 'replace', index: faceUps[0].i };
+          }
+        }
+        // Budget épuisé (ou aucune carte visible) → on termine.
+        p._stall = 0;
+        return { action: 'replace', index: lastHidden };
+      }
+    }
 
     // 1) Opportunité de colonne franchement bonne → on la prend.
     if (opp && opp.bonus > 4) return { action: 'replace', index: opp.index };

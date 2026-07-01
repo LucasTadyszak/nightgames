@@ -8,6 +8,7 @@
 // ══════════════════════════════════════════════════════════════════════
 
 const E = require('./engine.js');
+const AI = require('./ai.js');
 
 let passed = 0, failed = 0;
 const results = [];
@@ -209,9 +210,58 @@ test('La partie se termine quand un total atteint 100', () => {
   eq(s.winner, 1, 'gagnant = plus bas total');
 });
 
+// ── IA : conscience de la règle du doublement (moyen / difficile) ─────
+// Prépare un état où le joueur courant a UNE seule carte cachée : poser
+// dessus terminerait la manche.
+function oneHiddenState(level, myFaceValues, oppFaceValue) {
+  const s = E.newGame([{ name: 'AI', isAI: true, aiLevel: level }, { name: 'Opp' }], { rng: seededRng(1) });
+  s.phase = 'drawn';
+  s.currentPlayer = 0;
+  s.drawnFrom = 'draw';
+  // Grille IA : 11 cartes visibles (valeurs fournies) + 1 cachée en index 11.
+  s.players[0].grid = myFaceValues.map((v) => ({ value: v, faceUp: true, removed: false }));
+  s.players[0].grid.push({ value: 7, faceUp: false, removed: false }); // dernière cachée
+  // Adversaire : 12 cartes visibles identiques (score connu).
+  s.players[1].grid = Array.from({ length: 12 }, () => ({ value: oppFaceValue, faceUp: true, removed: false }));
+  return s;
+}
+
+test('IA difficile : ne termine PAS la manche si elle serait doublée', () => {
+  // IA très en retard (11×10 visibles), adversaire à 0 → finir = doublement.
+  const s = oneHiddenState('hard', Array(11).fill(10), 0);
+  s.drawnCard = 12; // carte haute : aucun remplacement améliorant
+  const d = AI.afterDraw(s);
+  assert(d.action === 'replace', 'doit poser une carte');
+  assert(d.index !== 11, 'ne doit PAS poser sur la dernière cachée (ne pas terminer)');
+  assert(s.players[0].grid[d.index].faceUp, 'doit poser sur une carte déjà visible');
+});
+
+test('IA difficile : termine la manche si elle est clairement en tête', () => {
+  // IA à 0 (11 zéros visibles), adversaire à 12 partout → finir sans risque.
+  const s = oneHiddenState('hard', Array(11).fill(0), 12);
+  s.drawnCard = 1; // carte basse
+  const d = AI.afterDraw(s);
+  eq(d.index, 11, 'doit terminer en posant sur la dernière cachée');
+});
+
+test('IA : budget de temporisation borné → la manche se termine toujours', () => {
+  // Même situation défavorable répétée : après quelques temporisations,
+  // l’IA finit par terminer (sinon blocage). On simule des tours successifs.
+  const s = oneHiddenState('hard', Array(11).fill(10), 0);
+  let finishedAtTurn = -1;
+  for (let t = 0; t < 12; t++) {
+    s.phase = 'drawn'; s.currentPlayer = 0; s.drawnFrom = 'draw'; s.drawnCard = 12;
+    const d = AI.afterDraw(s);
+    if (d.index === 11) { finishedAtTurn = t; break; }
+    // applique la temporisation (pose sur la carte visible choisie)
+    s.players[0].grid[d.index].value = 12;
+  }
+  assert(finishedAtTurn >= 0, 'l’IA doit finir par terminer la manche');
+  assert(finishedAtTurn <= 5, 'dans un nombre borné de tours (budget de patience)');
+});
+
 // ── Intégrité : simulation d’une partie complète pilotée par l’IA ─────
 test('Simulation IA complète : partie qui se termine sans erreur', () => {
-  const AI = require('./ai.js');
   const s = E.newGame(
     [{ name: 'A', isAI: true, aiLevel: 'hard' },
      { name: 'B', isAI: true, aiLevel: 'medium' },
