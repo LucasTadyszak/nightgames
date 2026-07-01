@@ -281,6 +281,21 @@
   // ══════════════════════════════════════════════════════════════════
   // BOUCLE DE JEU : à qui de jouer ?
   // ══════════════════════════════════════════════════════════════════
+  // Vrai UNIQUEMENT quand le siège actif est un humain à qui c'est vraiment
+  // le tour de jouer. On exige activeSeat === S.currentPlayer : sinon, juste
+  // après qu'un humain a fini son tour (le moteur a déjà passé la main mais
+  // `activeSeat` n'est pas encore ré-évalué), le plateau resterait
+  // interactif et un tap jouerait le tour de l'adversaire. C'était la cause
+  // du bug "l'IA joue à ma place / en boucle".
+  function isMyTurnNow() {
+    if (!S || isAI(activeSeat)) return false;
+    if (S.phase === 'setup') return E.initialFlipsLeft(S, activeSeat) > 0;
+    if (S.phase === 'turn' || S.phase === 'drawn' || S.phase === 'flip') {
+      return activeSeat === S.currentPlayer;
+    }
+    return false;
+  }
+
   function runSeat() {
     if (!S) return;
     if (S.phase === 'gameEnd') { renderBoard(); return showGameEnd(); }
@@ -385,12 +400,14 @@
     const banner = bannerText();
     const centerHTML = renderCenter();
 
-    // Grille du joueur actif.
-    const mineSelectable = humanActing && (S.phase === 'drawn' || S.phase === 'flip' || isSetup);
+    // Grille du joueur actif. Interactivité gouvernée par isMyTurnNow()
+    // (et non par activeSeat seul) pour ne jamais rester cliquable pendant
+    // le passage de main.
+    const canAct = isMyTurnNow();
     const myGrid = S.players[me].grid.map((c, ci) => {
       const key = `${me}:${ci}:${c.value}`;
       let selectable = false, highlight = false;
-      if (humanActing) {
+      if (canAct) {
         if (isSetup) selectable = !c.faceUp && !c.removed;
         else if (S.phase === 'drawn') selectable = !c.removed;         // remplacer n'importe laquelle
         else if (S.phase === 'flip') selectable = !c.faceUp && !c.removed; // révéler une cachée
@@ -446,8 +463,7 @@
     const top = E.topDiscard(S);
     const drawCell = { value: 0, faceUp: false, removed: false };
     const discCell = { value: top, faceUp: true, removed: false };
-    const humanActing = !isAI(activeSeat);
-    const canPickSource = humanActing && S.phase === 'turn';
+    const canPickSource = isMyTurnNow() && S.phase === 'turn';
 
     const drawnHTML = (S.phase === 'drawn')
       ? `<div class="cs-pile-wrap"><div class="cs-drawn">${cardHTML({ value: S.drawnCard, faceUp: true, removed: false }, `drawn:${S.drawnCard}:${Date.now()}`, {})}</div>
@@ -473,8 +489,7 @@
   }
 
   function renderActions() {
-    const humanActing = !isAI(activeSeat);
-    if (!humanActing) return '';
+    if (!isMyTurnNow()) return '';
     if (S.phase === 'drawn' && S.drawnFrom === 'draw') {
       return `<div class="cs-actions">
         <button class="cs-action" data-do="discardDrawn">🗑️ Défausser & retourner</button>
@@ -492,7 +507,7 @@
       const inner = node.querySelector('.cs-card.selectable');
       if (!inner) return;
       node.onclick = () => {
-        if (S.phase !== 'turn' || isAI(activeSeat)) return;
+        if (!isMyTurnNow() || S.phase !== 'turn') return;
         haptic(8);
         if (node.dataset.src === 'draw') { E.drawFromPile(S); sfx.flip(); }
         else { E.takeFromDiscard(S); sfx.place(); }
@@ -503,7 +518,7 @@
     // Actions (défausser la pioche → retourner).
     el.querySelectorAll('[data-do]').forEach((b) => {
       b.onclick = () => {
-        if (isAI(activeSeat)) return;
+        if (!isMyTurnNow() || S.phase !== 'drawn') return;
         haptic(8);
         E.discardDrawn(S); sfx.place();
         renderBoard();
@@ -518,7 +533,7 @@
   }
 
   function onSlotTap(slot) {
-    if (isAI(activeSeat)) return;
+    if (!isMyTurnNow()) return;
     haptic(10);
     if (S.phase === 'setup') {
       E.flipInitial(S, activeSeat, slot);
@@ -559,15 +574,29 @@
     aiTimer = setTimeout(aiStep, step);
   }
 
+  // Fin d'un tour/siège de l'IA : on REPASSE toujours par runSeat() pour
+  // ré-évaluer à qui de jouer. Sans ça, `activeSeat` reste sur l'IA alors
+  // que le moteur a déjà passé la main → l'IA rejouerait le tour suivant
+  // (y compris celui d'un humain), en boucle. C'était le bug.
+  function handOver() {
+    saveGame();
+    clearTimeout(aiTimer);
+    const delay = settings.anim ? Math.max(320, settings.aiSpeed) : 80;
+    aiTimer = setTimeout(runSeat, delay);
+  }
+
   function aiStep() {
-    if (!S || isAI(activeSeat) === false) return;
+    // Garde-fou : ne jouer que si le siège actif est bien une IA.
+    if (!S || !isAI(activeSeat)) return;
 
     if (S.phase === 'setup') {
       const idx = AI.chooseInitialFlip(S, activeSeat);
       E.flipInitial(S, activeSeat, idx); sfx.flip();
       renderBoard();
+      // Encore une carte à révéler pour CETTE IA → on continue son setup ;
+      // sinon on rend la main (siège suivant, ou début de la partie).
       if (S.phase === 'setup' && E.initialFlipsLeft(S, activeSeat) > 0) return scheduleAI();
-      return void (aiTimer = setTimeout(runSeat, settings.aiSpeed));
+      return handOver();
     }
 
     if (S.phase === 'turn') {
@@ -575,26 +604,32 @@
       if (src === 'discard') { E.takeFromDiscard(S); sfx.place(); }
       else { E.drawFromPile(S); sfx.flip(); }
       renderBoard();
-      return scheduleAI();
+      return scheduleAI(); // même tour : la carte est maintenant "en main"
     }
 
     if (S.phase === 'drawn') {
       const d = AI.afterDraw(S);
-      if (d.action === 'replace') { E.replaceCard(S, d.index); sfx.place(); haptic(12); }
-      else { E.discardDrawn(S); sfx.place(); }
-      saveGame(); renderBoard();
+      if (d.action === 'replace') {
+        // replaceCard TERMINE le tour (endTurn interne) → on rend la main.
+        E.replaceCard(S, d.index); sfx.place(); haptic(12);
+        renderBoard();
+        return handOver();
+      }
+      // Défausse de la pioche : il reste à retourner une carte (phase flip).
+      E.discardDrawn(S); sfx.place();
+      renderBoard();
       return scheduleAI();
     }
 
     if (S.phase === 'flip') {
+      // flipCard TERMINE aussi le tour → on rend la main.
       E.flipCard(S, AI.chooseFlip(S)); sfx.flip();
-      saveGame(); renderBoard();
-      return scheduleAI();
+      renderBoard();
+      return handOver();
     }
 
-    // Le tour a changé de main / la manche est finie.
-    saveGame();
-    aiTimer = setTimeout(runSeat, settings.aiSpeed);
+    // Phase inattendue (roundEnd/gameEnd) : laisser runSeat gérer.
+    handOver();
   }
 
   // ══════════════════════════════════════════════════════════════════
